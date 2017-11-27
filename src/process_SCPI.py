@@ -19,6 +19,19 @@ __version__ = '0.1.0' #Versioning: http://www.python.org/dev/peps/pep-0386/
 
 import aardvark_py
 import time
+from array import array
+from struct import unpack
+
+# ---------
+# Constants
+
+# I2C config
+I2C = True
+SPI = True
+GPIO = False
+Pullups = True
+radix = 16
+Bitrate = 100
 
 class aardvark:
     
@@ -42,15 +55,19 @@ class aardvark:
         self.time_size = 4
         
         # The leght of an ascii request in bytes
-        self.ascii_size = 128        
+        self.ascii_size = 128 
         
     #end def
     
-    def __exit__(self):
+    def __enter__(self):
+        return self
+    # end def
+    
+    def __exit__(self, type, value, traceback):
         aardvark_py.aa_close(self.port)
     #end def
     
-    def configure_aardvark():
+    def configure_aardvark(self):
         """ 
         Function to configure the aardvark for pySCPI operation if there is one
         available.
@@ -120,7 +137,7 @@ class aardvark:
         return Aardvark_in_use
     # end def        
     
-    def send_SCPI(command, address):
+    def send_SCPI(self, command, address):
         """
         Function to send a SCPI command to the slave device
         
@@ -146,7 +163,7 @@ class aardvark:
         
     # end def
     
-    def read_SCPI(command, address, return_format):
+    def read_SCPI(self, command, address, return_format):
         """
         Function to send a SCPI command to the slave device
         
@@ -157,10 +174,11 @@ class aardvark:
         # acceptible data formats
         acceptible_formats = {'int':2, 'long':4, 'long long':8, 'uint':2, 
                               'double':8, 'float':4, 'char':1, 'hex':1, 
-                              'name':self.name_size, 'ascii':self.ascii_size}
+                              'name':self.name_size, 'ascii':self.ascii_size,
+                              'string':self.ascii_size}
         
         # length of preamle
-        preamble_size = self.wflag_size + self.time_size + self.cksum_size
+        preamble_length = self.wflag_size + self.time_size + self.chksum_size
         
         # define the read legth as 0
         read_length = 0
@@ -169,9 +187,9 @@ class aardvark:
         perform_read = True
         
         # determin the correct read length
-        if type(return_format) = list:
+        if type(return_format) == list:
             # retun type is a list of items so it has a preamble
-            read_length += preamble_size
+            read_length += preamble_length
             
             # add up all of the lengths of the list items
             for item in return_format:
@@ -193,15 +211,15 @@ class aardvark:
             
             # add preamble to data length if required
             if return_format == 'ascii':
-                read_length = acceptible_formats('ascii')
+                read_length = acceptible_formats['ascii']
                 
             else:
-                read_length = preamble_size + acceptible_formats(return_format)
+                read_length = preamble_length + acceptible_formats[return_format]
             # end if
         
         else:
             # format is not acceptible
-            self.message = '***'+ item + " is an unacceptible format ***"            
+            self.message = '***'+ return_format + " is an unacceptible format ***"            
             perform_read = False
         # end if
         
@@ -222,20 +240,20 @@ class aardvark:
             aardvark_py.aa_sleep_ms(400)         
             
             # extract the data from the returned raw data
-            if type(return_format) = list:
+            if type(return_format) == list:
                 # there are multiple items in the return list
                 return_list = []
                 
                 # remove the preamble
-                data = raw_data[preamble_length + 1:-1]
+                data = raw_data[preamble_length:]
                 
                 for item in return_format:
                     # extract each item individually and append to list
                     return_list = return_list + \
-                        [extract_data(data[0:accptiable_formats(item)], item)]
+                        [extract_data(data[0:accptiable_formats[item]], item)]
                     
                     # shorten data list to what remains
-                    data = data[accptiable_formats(item)+1:-1]
+                    data = data[acceptiable_formats[item]:]
                 # end for
                 
                 return return_list
@@ -243,7 +261,7 @@ class aardvark:
             else:
                 # extract the sole peice of data
                 if return_format != 'ascii':
-                    data = raw_data[preamble_length + 1:-1]
+                    data = raw_data[preamble_length:]
                 # end if
                 return extract_data(data, return_format)
             #end if
@@ -256,7 +274,7 @@ class aardvark:
 # end class
         
 def extract_data(data, format_string):
-    if format_straing == 'ascii':
+    if format_string in ['ascii', 'string', 'name']:
         if 0 in data:
             # terminate printing at the null terminator 
             # of the string
@@ -265,28 +283,28 @@ def extract_data(data, format_string):
             # no null terminator
             return ''.join([chr(x) for x in data])
         # end if        
-    elif print_format == 'int':
+    elif format_string == 'int':
         return unpack('<h', ''.join([chr(x) for x in data]))[0]
         
-    elif print_format == 'long':
+    elif format_string == 'long':
         return unpack('<l', ''.join([chr(x) for x in data]))[0]
         
-    elif print_format == 'long long':
+    elif format_string == 'long long':
         return unpack('<q', ''.join([chr(x) for x in data]))[0]        
         
-    elif print_format == 'uint':
+    elif format_string == 'uint':
         return unpack('<H', ''.join([chr(x) for x in data]))[0] 
         
-    elif print_format == 'double':
+    elif format_string == 'double':
         return unpack('<d', ''.join([chr(x) for x in data]))[0]
         
-    elif print_format == 'float':
+    elif format_string == 'float':
         return unpack('<f', ''.join([chr(x) for x in data]))[0]                
         
-    elif print_format == 'char':
+    elif format_string == 'char':
         return unpack('<B', ''.join([chr(x) for x in data]))[0]
     
-    elif print_format == 'hex':
+    elif format_string == 'hex':
         return ' '.join(['%02X' % x for x in data])  
     # end if
     
@@ -296,30 +314,43 @@ def test():
     """
     Test code for this module.
     """
-    # test the gui defaults code
-    sample_gui_defaults = gui_defaults()
     
-    sample_gui_defaults.update_filename('this is a test.xml')
-    sample_gui_defaults.update_delay('1000')
-    sample_gui_defaults.update_dp('6')
-    sample_gui_defaults.update_length('12')
-    sample_gui_defaults.add_address('NEW', '0x44')
-    sample_gui_defaults.add_command('NEW COMMAND')
+    #create object
+    with aardvark() as AARD:
+        if AARD.port != None:
+            print "SUP:LED ON"
+            AARD.send_SCPI("SUP:LED ON", int("0x54", 16))
+            
+            print "\nSUP:TEL? 1,name:"
+            print AARD.read_SCPI("SUP:TEL? 1,name", int("0x54", 16), 'name')
+            
+            print "\nSUP:TEL? 1,length:"
+            print AARD.read_SCPI("SUP:TEL? 1,length", int("0x54", 16), 'int')
+            
+            print "\nSUP:TEL? 1,data"
+            print AARD.read_SCPI("SUP:TEL? 1,data", int("0x54", 16), 'long')
+            
+            print "\nSUP:TEL? 1,ascii"            
+            print AARD.read_SCPI("SUP:TEL? 1,ascii", int("0x54", 16), 'ascii')
+            
+            print "\nSUL:TEL? 1,data"
+            print AARD.read_SCPI("SUL:TEL? 1,data", int("0x54", 16), 'string')
+            
+            print "\nSUP:TEL? 1,data"
+            print AARD.read_SCPI("SUP:TEL? 1,data", int("0x54", 16), 'straing')            
+            
+            print "\nSUP:LED FLASH"
+            AARD.send_SCPI("SUP:LED FLASH", int("0x54", 16))       
+            
+            print "\nSUP:RES ERROR"
+            AARD.send_SCPI("SUP:RES ERROR", int("0x54", 16))                
+            
+        else:
+            print "No Aardvark Available"
+        # end if
     
-    first_errors = len(sample_gui_defaults.error_log)
+    # end with
     
-    print str(8-first_errors)  + '/8 sample tests passed'
-    
-    sample_gui_defaults.update_filename('this is a test.xm')
-    sample_gui_defaults.update_delay('10g0')
-    sample_gui_defaults.update_dp('0')
-    sample_gui_defaults.update_length('-4')
-    sample_gui_defaults.add_address('NEW', 'AD')
-    sample_gui_defaults.add_command('NEW COMMAND')
-    
-    new_errors = len(sample_gui_defaults.error_log) - first_errors
-    
-    print str(new_errors)  + '/8 sample tests failed (want 5)'    
 # end def
 
 
