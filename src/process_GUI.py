@@ -51,9 +51,16 @@ class process_window:
         button_frame.config(bg = default_color)
         button_frame.grid(row = 2, column = 0, sticky='sew')
         
-        self.next_button = TK.Button(button_frame, text = 'Next', 
-                                     command = partial(self.next_command, self), 
-                                     activebackground = 'green', width = 15)
+        if self.total_steps == 1:
+            self.next_button = TK.Button(button_frame, text = 'Finish', 
+                                         command = partial(self.finish_command, self), 
+                                         activebackground = 'green', width = 15)
+        else:
+            self.next_button = TK.Button(button_frame, text = 'Next', 
+                                         command = partial(self.next_command, self), 
+                                         activebackground = 'green', width = 15)     
+        #end if
+        
         self.next_button.config(font = button_font, bg = default_color, 
                                highlightbackground= default_color)
         self.next_button.grid(row = 0, column=2, sticky='e', padx=10, pady=10)  
@@ -86,8 +93,9 @@ class process_window:
         
         self.root.resizable(0,0)
         
-        self.process[self.current_step].gui(self.useable_frame)
         self.process[self.current_step].execute()
+        self.process[self.current_step].gui(self.useable_frame)
+        
         
         
     #end def
@@ -109,8 +117,8 @@ class process_window:
         self.process[self.current_step].gui(self.useable_frame)
         self.process[self.current_step].execute()
         
-        self.back_button.config(state = 'normal')
         self.set_step(self.current_step)
+        self.back_button.config(state = 'normal')
         
         if self.current_step == (self.total_steps-1):
             self.next_button.config(text = 'Finish',

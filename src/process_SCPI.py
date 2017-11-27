@@ -64,7 +64,9 @@ class aardvark:
     # end def
     
     def __exit__(self, type, value, traceback):
-        aardvark_py.aa_close(self.port)
+        if self.port != None:
+            aardvark_py.aa_close(self.port)
+        #end if
     #end def
     
     def configure_aardvark(self):
@@ -155,7 +157,7 @@ class aardvark:
         
         
         # Write the data to the slave device
-        aardvark_py.aa_i2c_write(self.port, address, 
+        aardvark_py.aa_i2c_write(self.port, int(address, 16), 
                                  aardvark_py.AA_I2C_NO_FLAGS, data)
         
         # pause
@@ -230,7 +232,7 @@ class aardvark:
             data = array('B', [1]*read_length) 
             
             # read from the slave device
-            read_data = aardvark_py.aa_i2c_read(self.port, address, 
+            read_data = aardvark_py.aa_i2c_read(self.port, int(address, 16), 
                                                 aardvark_py.AA_I2C_NO_FLAGS, 
                                                 data) 
             
@@ -319,31 +321,28 @@ def test():
     with aardvark() as AARD:
         if AARD.port != None:
             print "SUP:LED ON"
-            AARD.send_SCPI("SUP:LED ON", int("0x54", 16))
+            AARD.send_SCPI("SUP:LED ON", "0x54")
             
             print "\nSUP:TEL? 1,name:"
-            print AARD.read_SCPI("SUP:TEL? 1,name", int("0x54", 16), 'name')
+            print AARD.read_SCPI("SUP:TEL? 1,name", "0x54", 'name')
             
             print "\nSUP:TEL? 1,length:"
-            print AARD.read_SCPI("SUP:TEL? 1,length", int("0x54", 16), 'int')
+            print AARD.read_SCPI("SUP:TEL? 1,length", "0x54", 'int')
             
             print "\nSUP:TEL? 1,data"
-            print AARD.read_SCPI("SUP:TEL? 1,data", int("0x54", 16), 'long')
+            print AARD.read_SCPI("SUP:TEL? 1,data", "0x54", 'long')
             
             print "\nSUP:TEL? 1,ascii"            
-            print AARD.read_SCPI("SUP:TEL? 1,ascii", int("0x54", 16), 'ascii')
+            print AARD.read_SCPI("SUP:TEL? 1,ascii", "0x54", 'ascii')
             
             print "\nSUL:TEL? 1,data"
-            print AARD.read_SCPI("SUL:TEL? 1,data", int("0x54", 16), 'string')
+            print AARD.read_SCPI("SUL:TEL? 1,data", "0x54", 'string')
             
             print "\nSUP:TEL? 1,data"
-            print AARD.read_SCPI("SUP:TEL? 1,data", int("0x54", 16), 'straing')            
+            print AARD.read_SCPI("SUP:TEL? 1,data", "0x54", 'straing')             
             
-            print "\nSUP:LED FLASH"
-            AARD.send_SCPI("SUP:LED FLASH", int("0x54", 16))       
-            
-            print "\nSUP:RES ERROR"
-            AARD.send_SCPI("SUP:RES ERROR", int("0x54", 16))                
+            print "\nSUP:RES ERR"
+            AARD.send_SCPI("SUP:RES ERR", "0x54")                
             
         else:
             print "No Aardvark Available"
