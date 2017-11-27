@@ -30,6 +30,10 @@ class process_window:
     
     def __init__(self, input_struct):
         
+        if input_struct == None:
+            input_struct = test_struct()
+        # end if
+        
         self.root = TK.Tk()
         self.root.geometry('800x600')
         self.root.config(bg = default_color) # to show through the gaps between frames
@@ -144,9 +148,7 @@ def test():
     """
     Test code for this module.
     """
-    ts = test_struct()
-    
-    pw = process_window(ts)
+    pw = process_window(None)
     
     pw.start()
     
