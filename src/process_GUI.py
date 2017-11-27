@@ -82,6 +82,10 @@ class process_window:
         self.useable_frame.config(bg = default_color)
         self.useable_frame.grid(row = 1, column = 0)
         
+        self.wait_label = TK.Label(self.useable_frame, 
+                                   text = "Please wait, task in progress")
+        self.wait_label.config(font = label_font, bg = default_color)        
+        
         self.root.rowconfigure(0, weight = 1, minsize = 50)
         self.root.rowconfigure(1, weight = 1, minsize = 500)
         self.root.rowconfigure(2, weight = 1, minsize = 50)
@@ -93,16 +97,20 @@ class process_window:
         
         self.root.resizable(0,0)
         
-        self.process[self.current_step].execute()
-        self.process[self.current_step].gui(self.useable_frame)
-        
-        
-        
     #end def
     
     def start(self):
+        self.root.after(10, self.root.update())
+        self.root.after(100, self.initial_display())
         self.root.mainloop()
         
+    #end def
+    
+    def initial_display(self):
+        self.please_wait('on')
+        self.process[self.current_step].execute()
+        self.please_wait('off')
+        self.process[self.current_step].gui(self.useable_frame)
     #end def
     
     def set_step(self, step):
@@ -114,8 +122,10 @@ class process_window:
         self.process[self.current_step].close()
         self.current_step += 1
         
-        self.process[self.current_step].gui(self.useable_frame)
+        self.please_wait('on')
         self.process[self.current_step].execute()
+        self.please_wait('off')        
+        self.process[self.current_step].gui(self.useable_frame)
         
         self.set_step(self.current_step)
         self.back_button.config(state = 'normal')
@@ -124,6 +134,14 @@ class process_window:
             self.next_button.config(text = 'Finish',
                                     command = partial(self.finish_command, self))
         #end def
+        
+    def please_wait(self, state):
+        if state == 'on':
+            self.wait_label.grid(row = 0, column=0)   
+            self.root.update()
+            
+        else:
+            self.wait_label.grid_forget()    
             
     #end def
     
@@ -131,8 +149,10 @@ class process_window:
         self.process[self.current_step].close()
         self.current_step -= 1
         
-        self.process[self.current_step].gui(self.useable_frame)
+        self.please_wait('on')
         self.process[self.current_step].execute()
+        self.please_wait('off')        
+        self.process[self.current_step].gui(self.useable_frame)
         
         self.next_button.config(text = "Next", 
                                 command = partial(self.next_command, self))
