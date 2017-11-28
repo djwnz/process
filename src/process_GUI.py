@@ -65,6 +65,8 @@ class process_window:
                                highlightbackground= default_color)
         self.next_button.grid(row = 0, column=2, sticky='e', padx=10, pady=10)  
         
+        self.next_state = 'normal'
+        
         self.progress_label = TK.Label(button_frame, 
                                        text = "step 1/"+str(self.total_steps))
         self.progress_label.config(font = label_font, bg = default_color)
@@ -77,6 +79,8 @@ class process_window:
                                 highlightbackground= default_color, 
                                 state = 'disabled')
         self.back_button.grid(row = 0, column=0, sticky='w', padx=10, pady=10) 
+        
+        self.back_state = 'disabled'
         
         self.useable_frame = TK.Frame(self.root)
         self.useable_frame.config(bg = default_color)
@@ -122,12 +126,12 @@ class process_window:
         self.process[self.current_step].close()
         self.current_step += 1
         
+        self.set_step(self.current_step)
         self.please_wait('on')
         self.process[self.current_step].execute()
         self.please_wait('off')        
         self.process[self.current_step].gui(self.useable_frame)
         
-        self.set_step(self.current_step)
         self.back_button.config(state = 'normal')
         
         if self.current_step == (self.total_steps-1):
@@ -137,17 +141,33 @@ class process_window:
         
     def please_wait(self, state):
         if state == 'on':
+            self.back_state = str(self.back_button['state'])
+            self.next_state = str(self.next_button['state'])            
+            if self.back_state != 'disabled':
+                self.back_button.config(state='disabled')
+            #end if
+            if self.next_state != 'disabled':
+                self.next_button.config(state='disabled')
+            #end if            
             self.wait_label.grid(row = 0, column=0)   
             self.root.update()
             
         else:
-            self.wait_label.grid_forget()    
+            self.wait_label.grid_forget()  
+            if self.back_state != 'disabled':
+                self.back_button.config(state=self.back_state)
+            #end if
+            if self.next_state != 'disabled':
+                self.next_button.config(state=self.next_state)
+            #end if             
             
     #end def
     
     def back_command(self, event):
         self.process[self.current_step].close()
         self.current_step -= 1
+        
+        self.set_step(self.current_step)
         
         self.please_wait('on')
         self.process[self.current_step].execute()
@@ -156,7 +176,6 @@ class process_window:
         
         self.next_button.config(text = "Next", 
                                 command = partial(self.next_command, self))
-        self.set_step(self.current_step)
         
         if self.current_step == 0:
             self.back_button.config(state = 'disabled')
