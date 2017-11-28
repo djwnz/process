@@ -21,10 +21,13 @@ import Tkinter as TK
 from functools import partial
 import process_SCPI
 import process_GUI
+import time
 
-class BM2_step_1:
+class BM2_verification:
     def __init__(self):
-        self.title = "Verify what is being read from the BM2 then press next"
+        self.title = "Verify BM2 Values"
+        self.text = "Check these values against what you can measure/" +\
+            "what you expect.\n Press next when you have done this."
         self.no_aardvark = False
         
         self.voltage_read = 0.0
@@ -53,45 +56,50 @@ class BM2_step_1:
                            bg = process_GUI.default_color)
         self.Header.grid(row = 0, column=0, columnspan = 2, sticky = 'nsew')
         
+        self.body = TK.Label(parent_frame, text = self.text)
+        self.body.config(font = process_GUI.label_font, 
+                           bg = process_GUI.default_color)
+        self.body.grid(row = 1, column=0, columnspan = 2, sticky = 'nsew')        
+        
         if self.no_aardvark:
             self.error_label = TK.Label(parent_frame, text = "No Aardvark Connected")
             self.error_label.config(font = process_GUI.label_font, 
                                  bg = process_GUI.default_color)
-            self.error_label.grid(row = 1, column=0, columnspan = 2)   
+            self.error_label.grid(row = 2, column=0, columnspan = 2)   
         
         else:
         
             self.voltage_label = TK.Label(parent_frame, text = "Voltage (V):")
             self.voltage_label.config(font = process_GUI.label_font, 
                                  bg = process_GUI.default_color)
-            self.voltage_label.grid(row = 1, column=0, sticky = 'e')
+            self.voltage_label.grid(row = 2, column=0, sticky = 'e')
             
             self.voltage = TK.Entry(parent_frame, justify = 'left', width = 7)
             self.voltage.config(font = process_GUI.text_font, 
                                 highlightbackground= process_GUI.default_color)
-            self.voltage.grid(row = 1, column = 1, ipady = 3, sticky = 'w')    
+            self.voltage.grid(row = 2, column = 1, ipady = 3, sticky = 'w')    
             self.voltage.insert(0, str(self.voltage_read))
             
             self.temp_label = TK.Label(parent_frame, text = "Temperature (degC):")
             self.temp_label.config(font = process_GUI.label_font, 
                                  bg = process_GUI.default_color)
-            self.temp_label.grid(row = 2, column=0, sticky = 'e')
+            self.temp_label.grid(row = 3, column=0, sticky = 'e')
             
             self.temp = TK.Entry(parent_frame, justify = 'left', width = 7)
             self.temp.config(font = process_GUI.text_font, 
                              highlightbackground= process_GUI.default_color)
-            self.temp.grid(row = 2, column = 1, ipady = 3, sticky = 'w')
+            self.temp.grid(row = 3, column = 1, ipady = 3, sticky = 'w')
             self.temp.insert(0, str(self.temp_read))
             
             self.SOC_label = TK.Label(parent_frame, text = "SOC (%):")
             self.SOC_label.config(font = process_GUI.label_font, 
                                  bg = process_GUI.default_color)
-            self.SOC_label.grid(row = 3, column=0, sticky = 'e')     
+            self.SOC_label.grid(row = 4, column=0, sticky = 'e')     
             
             self.SOC = TK.Entry(parent_frame, justify = 'left', width = 7)
             self.SOC.config(font = process_GUI.text_font, 
                             highlightbackground= process_GUI.default_color)
-            self.SOC.grid(row = 3, column = 1, ipady = 3, sticky = 'w')
+            self.SOC.grid(row = 4, column = 1, ipady = 3, sticky = 'w')
             self.SOC.insert(0, str(self.SOC_read))
         
     #end def
@@ -99,6 +107,7 @@ class BM2_step_1:
     def close(self):
         
         self.Header.grid_forget()
+        self.body.grid_forget()
         
         if self.no_aardvark:
             self.error_label.grid_forget()
@@ -115,9 +124,14 @@ class BM2_step_1:
     #end def
 #end class    
 
-class BM2_step_2:
+class BM2_serial_number:
     def __init__(self):
-        self.title = "Update the desired serial number of the BM2 and click update"
+        self.title = "Update the BM2 serial number"
+        self.text = "Enter the desired serial number in the box and then " +\
+            "press \"update\" to update\nthe module's serial number.\nIf the " +\
+            "current serial number is not the default (0) this will not work.\n" +\
+            "Press next when you have finished."
+        
         self.no_aardvark = False
         
         self.serial_number = 0
@@ -143,23 +157,28 @@ class BM2_step_2:
                            bg = process_GUI.default_color)
         self.Header.grid(row = 0, column=0, columnspan = 2, sticky = 'nsew')
         
+        self.body = TK.Label(parent_frame, text = self.text)
+        self.body.config(font = process_GUI.label_font, 
+                           bg = process_GUI.default_color)
+        self.body.grid(row = 1, column=0, columnspan = 2, sticky = 'nsew')          
+        
         if self.no_aardvark:
             self.error_label = TK.Label(parent_frame, text = "No Aardvark Connected")
             self.error_label.config(font = process_GUI.label_font, 
                                  bg = process_GUI.default_color)
-            self.error_label.grid(row = 1, column=0, columnspan = 2)   
+            self.error_label.grid(row = 2, column=0, columnspan = 2)   
         
         else:
         
             self.serial_label = TK.Label(parent_frame, text = "Serial Number:")
             self.serial_label.config(font = process_GUI.label_font, 
                                  bg = process_GUI.default_color)
-            self.serial_label.grid(row = 1, column=0, sticky = 'e')
+            self.serial_label.grid(row = 2, column=0, sticky = 'e')
             
             self.serial = TK.Entry(parent_frame, justify = 'left', width = 7)
             self.serial.config(font = process_GUI.text_font, 
                                 highlightbackground= process_GUI.default_color)
-            self.serial.grid(row = 1, column = 1, ipady = 3, sticky = 'w')    
+            self.serial.grid(row = 2, column = 1, ipady = 3, sticky = 'w')    
             self.serial.insert(0, str(self.serial_number))
             
             self.update_button = TK.Button(parent_frame, text = 'Update', 
@@ -168,7 +187,7 @@ class BM2_step_2:
             self.update_button.config(font = process_GUI.button_font, 
                                       bg = process_GUI.default_color, 
                                     highlightbackground= process_GUI.default_color)
-            self.update_button.grid(row = 2, column=0, columnspan = 2,
+            self.update_button.grid(row = 3, column=0, columnspan = 2,
                                     padx=10, pady=10)            
         
     #end def
@@ -176,6 +195,7 @@ class BM2_step_2:
     def close(self):
         
         self.Header.grid_forget()
+        self.body.grid_forget()
         
         if self.no_aardvark:
             self.error_label.grid_forget()
@@ -228,16 +248,128 @@ class BM2_step_2:
     #end def
 #end class    
     
-#end class
+class BM2_heater_test:
+    def __init__(self):
+        self.title = "Test the operation of the heater"
+        self.text = "The heater will be tested by turning it on and off " +\
+            "again and calculating\nthe power drawn by the heaters.\n" +\
+            "For 2 and 4 cell batteries this should be approximately 10W and " +\
+            "for 3 cells, 12W" 
+        self.no_aardvark = False
+        
+        self.initial_current = 0
+        self.voltage = 0
+        
+    # end def
+    
+    def execute(self):
+        with process_SCPI.aardvark() as AARD:
+            if AARD.port != None:
+                # read current serial number
+                self.initial_current = AARD.read_SCPI("BM2:TEL? 10,data", 
+                                                      "0x5C", "uint")/1000.0
+                self.voltage = AARD.read_SCPI("BM2:TEL? 9,data", 
+                                              "0x5C", "uint")/1000.0
+            else:
+                self.no_aardvark = True
+            #end if
+        # end with
+        
+    # end def
+    
+    def gui(self, parent_frame):
+        
+        self.Header = TK.Label(parent_frame, text = self.title)
+        self.Header.config(font = process_GUI.title_font, 
+                           bg = process_GUI.default_color)
+        self.Header.grid(row = 0, column=0, columnspan = 2, sticky = 'nsew')
+        
+        self.body = TK.Label(parent_frame, text = self.text)
+        self.body.config(font = process_GUI.label_font, 
+                           bg = process_GUI.default_color)
+        self.body.grid(row = 1, column=0, columnspan = 2, sticky = 'nsew')          
+        
+        if self.no_aardvark:
+            self.error_label = TK.Label(parent_frame, text = "No Aardvark Connected")
+            self.error_label.config(font = process_GUI.label_font, 
+                                 bg = process_GUI.default_color)
+            self.error_label.grid(row = 2, column=0, columnspan = 2)   
+        
+        else:
+        
+            self.power_label = TK.Label(parent_frame, text = "Heater Power (W):")
+            self.power_label.config(font = process_GUI.label_font, 
+                                 bg = process_GUI.default_color)
+            self.power_label.grid(row = 2, column=0, sticky = 'e')
+            
+            self.power = TK.Entry(parent_frame, justify = 'left', width = 7)
+            self.power.config(font = process_GUI.text_font, 
+                                highlightbackground= process_GUI.default_color)
+            self.power.grid(row = 2, column = 1, ipady = 3, sticky = 'w')    
+            
+            self.heater_button = TK.Button(parent_frame, text = 'Test Heater', 
+                                         command = partial(self.heater_command, self), 
+                                         activebackground = 'green', width = 15)
+            self.heater_button.config(font = process_GUI.button_font, 
+                                      bg = process_GUI.default_color, 
+                                    highlightbackground= process_GUI.default_color)
+            self.heater_button.grid(row = 3, column=0, columnspan = 2,
+                                    padx=10, pady=10)            
+        
+    #end def
+    
+    def close(self):
+        
+        self.Header.grid_forget()
+        self.body.grid_forget()
+        
+        if self.no_aardvark:
+            self.error_label.grid_forget()
+            
+        else:
+            self.power_label.grid_forget()
+            self.power.grid_forget()
+            self.heater_button.grid_forget()
+        # end if
+        
+    #end def
+    
+    def heater_command(self, event):
+        #self.update_button.config(state = 'disabled')
+        
+        rest_power = self.initial_current*self.voltage
+        
+        new_current = self.initial_current
+        
+        self.power.delete(0, 'end')
+        
+        with process_SCPI.aardvark() as AARD:
+            if AARD.port != None:
+                AARD.send_SCPI("BM2:HEA ON", "0x5C")
+                time.sleep(1)
+                new_current = AARD.read_SCPI("BM2:TEL? 10,data", 
+                                             "0x5C", "uint")/1000.0                
+                AARD.send_SCPI("BM2:HEA AUTO", "0x5C")
+            else:
+                self.no_aardvark = True
+            #end if
+        # end with
+        
+        heater_power = (new_current * self.voltage) - rest_power
+        
+        self.power.insert(0, str(heater_power))
+    #end def
+#end class    
     
     
 class BM2_Process:
     def __init__(self):
         self.title = "Testing Program for the BM2"
         
-        step1 = BM2_step_1()
-        step2 = BM2_step_2()
+        verification = BM2_verification()
+        heater_test = BM2_heater_test()
+        serial_number = BM2_serial_number()
         
-        self.process = [step1, step2]
+        self.process = [verification, heater_test, serial_number]
     # end def        
 #end class
