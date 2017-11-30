@@ -43,7 +43,7 @@ class process_window:
         
         self.process = input_struct.process 
         
-        Header = TK.Label(self.root, text = input_struct.title)
+        Header = TK.Label(self.root, text = input_struct.properties.title)
         Header.config(font = title_font, bg = default_color)
         Header.grid(row = 0, column=0, sticky = 'nsew')
         

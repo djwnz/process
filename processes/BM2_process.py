@@ -22,9 +22,10 @@ from functools import partial
 import process_SCPI
 import process_GUI
 import time
+import SUP_process
 
 class BM2_verification:
-    def __init__(self):
+    def __init__(self, properties):
         self.title = "Verify BM2 Values"
         self.text = "Check these values against what you can measure/" +\
             "what you expect.\n Press next when you have done this."
@@ -34,14 +35,21 @@ class BM2_verification:
         self.temp_read = 0.0
         self.SOC_read = 0
         
+        self.properties = properties
+        
     # end def
     
     def execute(self):
         with process_SCPI.aardvark() as AARD:
             if AARD.port != None:
-                self.voltage_read = AARD.read_SCPI("BM2:TEL? 9,data", "0x5C", "uint")/1000.0
-                self.temp_read = AARD.read_SCPI("BM2:TEL? 8,data", "0x5C", "uint")/100.0
-                self.SOC_read = AARD.read_SCPI("BM2:TEL? 13,data", "0x5C", "uint")
+                self.voltage_read = AARD.read_SCPI("BM2:TEL? 9,data", 
+                                                   self.properties.address, 
+                                                   "uint")/1000.0
+                self.temp_read = AARD.read_SCPI("BM2:TEL? 8,data", 
+                                                self.properties.address, 
+                                                "uint")/100.0
+                self.SOC_read = AARD.read_SCPI("BM2:TEL? 13,data", 
+                                               self.properties.address, "uint")
             else:
                 self.no_aardvark = True
             #end if
@@ -62,7 +70,8 @@ class BM2_verification:
         self.body.grid(row = 1, column=0, columnspan = 2, sticky = 'nsew')        
         
         if self.no_aardvark:
-            self.error_label = TK.Label(parent_frame, text = "No Aardvark Connected")
+            self.error_label = TK.Label(parent_frame, 
+                                        text = "No Aardvark Connected")
             self.error_label.config(font = process_GUI.label_font, 
                                  bg = process_GUI.default_color)
             self.error_label.grid(row = 2, column=0, columnspan = 2)   
@@ -80,7 +89,8 @@ class BM2_verification:
             self.voltage.grid(row = 2, column = 1, ipady = 3, sticky = 'w')    
             self.voltage.insert(0, str(self.voltage_read))
             
-            self.temp_label = TK.Label(parent_frame, text = "Temperature (degC):")
+            self.temp_label = TK.Label(parent_frame, 
+                                       text = "Temperature (degC):")
             self.temp_label.config(font = process_GUI.label_font, 
                                  bg = process_GUI.default_color)
             self.temp_label.grid(row = 3, column=0, sticky = 'e')
@@ -124,132 +134,8 @@ class BM2_verification:
     #end def
 #end class    
 
-class BM2_serial_number:
-    def __init__(self):
-        self.title = "Update the BM2 serial number"
-        self.text = "Enter the desired serial number in the box and then " +\
-            "press \"update\" to update\nthe module's serial number.\nIf the " +\
-            "current serial number is not the default (0) this will not work.\n" +\
-            "Press next when you have finished."
-        
-        self.no_aardvark = False
-        
-        self.serial_number = 0
-        
-    # end def
-    
-    def execute(self):
-        with process_SCPI.aardvark() as AARD:
-            if AARD.port != None:
-                # read current serial number
-                self.serial_number = 0
-            else:
-                self.no_aardvark = True
-            #end if
-        # end with
-        
-    # end def
-    
-    def gui(self, parent_frame):
-        
-        self.Header = TK.Label(parent_frame, text = self.title)
-        self.Header.config(font = process_GUI.title_font, 
-                           bg = process_GUI.default_color)
-        self.Header.grid(row = 0, column=0, columnspan = 2, sticky = 'nsew')
-        
-        self.body = TK.Label(parent_frame, text = self.text)
-        self.body.config(font = process_GUI.label_font, 
-                           bg = process_GUI.default_color)
-        self.body.grid(row = 1, column=0, columnspan = 2, sticky = 'nsew')          
-        
-        if self.no_aardvark:
-            self.error_label = TK.Label(parent_frame, text = "No Aardvark Connected")
-            self.error_label.config(font = process_GUI.label_font, 
-                                 bg = process_GUI.default_color)
-            self.error_label.grid(row = 2, column=0, columnspan = 2)   
-        
-        else:
-        
-            self.serial_label = TK.Label(parent_frame, text = "Serial Number:")
-            self.serial_label.config(font = process_GUI.label_font, 
-                                 bg = process_GUI.default_color)
-            self.serial_label.grid(row = 2, column=0, sticky = 'e')
-            
-            self.serial = TK.Entry(parent_frame, justify = 'left', width = 7)
-            self.serial.config(font = process_GUI.text_font, 
-                                highlightbackground= process_GUI.default_color)
-            self.serial.grid(row = 2, column = 1, ipady = 3, sticky = 'w')    
-            self.serial.insert(0, str(self.serial_number))
-            
-            self.update_button = TK.Button(parent_frame, text = 'Update', 
-                                         command = partial(self.update_command, self), 
-                                         activebackground = 'green', width = 15)
-            self.update_button.config(font = process_GUI.button_font, 
-                                      bg = process_GUI.default_color, 
-                                    highlightbackground= process_GUI.default_color)
-            self.update_button.grid(row = 3, column=0, columnspan = 2,
-                                    padx=10, pady=10)            
-        
-    #end def
-    
-    def close(self):
-        
-        self.Header.grid_forget()
-        self.body.grid_forget()
-        
-        if self.no_aardvark:
-            self.error_label.grid_forget()
-            
-        else:
-            self.serial_label.grid_forget()
-            self.serial.grid_forget()
-            self.update_button.grid_forget()
-        # end if
-        
-    #end def
-    
-    def get_sn(self):
-        """
-        Function to find the desired delay that was entered in the gui.
-        
-        @return     (int)         The delay that will be used in ms.
-        """        
-        # read the delay from the gui
-        serial_text = self.serial.get()
-        # verify if the delay is valid
-        if serial_text.isdigit():
-            # is a good delay so set it as the delay time
-            return serial_text
-            
-        else:
-            # the delay is not valid
-            print '*** Requested delay is not valid, '\
-                  'reverting to default ***'
-            # restore the default delay
-            return '0'
-        # end if    
-    # end def    
-    
-    def update_command(self, event):
-        #self.update_button.config(state = 'disabled')
-        
-        serial_text = self.get_sn()
-        nvm_key = self.serial_number + 12345
-        
-        with process_SCPI.aardvark() as AARD:
-            if AARD.port != None:
-                AARD.send_SCPI("SUP:NVM UNLOCK,"+str(nvm_key), "0x5C")
-                AARD.send_SCPI("SUP:NVM SERIAL,"+serial_text, "0x5C")
-                AARD.send_SCPI("SUP:NVM WRITE,1", "0x5C")
-            else:
-                self.no_aardvark = True
-            #end if
-        # end with
-    #end def
-#end class    
-    
 class BM2_heater_test:
-    def __init__(self):
+    def __init__(self, properties):
         self.title = "Test the operation of the heater"
         self.text = "The heater will be tested by turning it on and off " +\
             "again and calculating\nthe power drawn by the heaters.\n" +\
@@ -259,6 +145,7 @@ class BM2_heater_test:
         
         self.initial_current = 0
         self.voltage = 0
+        self.properties = properties
         
     # end def
     
@@ -267,9 +154,11 @@ class BM2_heater_test:
             if AARD.port != None:
                 # read current serial number
                 self.initial_current = AARD.read_SCPI("BM2:TEL? 10,data", 
-                                                      "0x5C", "uint")/1000.0
+                                                      self.properties.address, 
+                                                      "uint")/1000.0
                 self.voltage = AARD.read_SCPI("BM2:TEL? 9,data", 
-                                              "0x5C", "uint")/1000.0
+                                              self.properties.address, 
+                                              "uint")/1000.0
             else:
                 self.no_aardvark = True
             #end if
@@ -290,14 +179,16 @@ class BM2_heater_test:
         self.body.grid(row = 1, column=0, columnspan = 2, sticky = 'nsew')          
         
         if self.no_aardvark:
-            self.error_label = TK.Label(parent_frame, text = "No Aardvark Connected")
+            self.error_label = TK.Label(parent_frame, 
+                                        text = "No Aardvark Connected")
             self.error_label.config(font = process_GUI.label_font, 
                                  bg = process_GUI.default_color)
             self.error_label.grid(row = 2, column=0, columnspan = 2)   
         
         else:
         
-            self.power_label = TK.Label(parent_frame, text = "Heater Power (W):")
+            self.power_label = TK.Label(parent_frame, 
+                                        text = "Heater Power (W):")
             self.power_label.config(font = process_GUI.label_font, 
                                  bg = process_GUI.default_color)
             self.power_label.grid(row = 2, column=0, sticky = 'e')
@@ -308,7 +199,8 @@ class BM2_heater_test:
             self.power.grid(row = 2, column = 1, ipady = 3, sticky = 'w')    
             
             self.heater_button = TK.Button(parent_frame, text = 'Test Heater', 
-                                         command = partial(self.heater_command, self), 
+                                         command = partial(self.heater_command, 
+                                                           self), 
                                          activebackground = 'green', width = 15)
             self.heater_button.config(font = process_GUI.button_font, 
                                       bg = process_GUI.default_color, 
@@ -345,11 +237,12 @@ class BM2_heater_test:
         
         with process_SCPI.aardvark() as AARD:
             if AARD.port != None:
-                AARD.send_SCPI("BM2:HEA ON", "0x5C")
-                time.sleep(1)
+                AARD.send_SCPI("BM2:HEA ON", self.properties.address)
+                time.sleep(2)
                 new_current = AARD.read_SCPI("BM2:TEL? 10,data", 
-                                             "0x5C", "uint")/1000.0                
-                AARD.send_SCPI("BM2:HEA AUTO", "0x5C")
+                                             self.properties.address, 
+                                             "int")/-1000.0                
+                AARD.send_SCPI("BM2:HEA OFF", self.properties.address)
             else:
                 self.no_aardvark = True
             #end if
@@ -359,17 +252,24 @@ class BM2_heater_test:
         
         self.power.insert(0, str(heater_power))
     #end def
-#end class    
-    
-    
+#end class   
+
 class BM2_Process:
     def __init__(self):
-        self.title = "Testing Program for the BM2"
+        self.properties = SUP_process.process_properties("BM2", "0x5C")
         
-        verification = BM2_verification()
-        heater_test = BM2_heater_test()
-        serial_number = BM2_serial_number()
+        verification = BM2_verification(self.properties)
+        heater_test = BM2_heater_test(self.properties)
+        serial_number = SUP_process.Serial_number(self.properties)
+        address_request = SUP_process.Address_request(self.properties)
+        I2C_Address = SUP_process.I2C_address(self.properties)
+        frq_tuning = SUP_process.Update_OSCTUN(self.properties)
         
-        self.process = [verification, heater_test, serial_number]
+        self.process = [address_request, 
+                        verification, 
+                        frq_tuning,
+                        heater_test, 
+                        serial_number,
+                        I2C_Address]
     # end def        
 #end class

@@ -175,9 +175,9 @@ class aardvark:
         """  
         # acceptible data formats
         acceptible_formats = {'int':2, 'long':4, 'long long':8, 'uint':2, 
-                              'double':8, 'float':4, 'char':1, 'hex':1, 
-                              'name':self.name_size, 'ascii':self.ascii_size,
-                              'string':self.ascii_size}
+                              'double':8, 'float':4, 'char':1, 'schar':1, 
+                              'hex':1, 'name':self.name_size, 
+                              'ascii':self.ascii_size, 'string':self.ascii_size}
         
         # length of preamle
         preamble_length = self.wflag_size + self.time_size + self.chksum_size
@@ -305,6 +305,9 @@ def extract_data(data, format_string):
         
     elif format_string == 'char':
         return unpack('<B', ''.join([chr(x) for x in data]))[0]
+    
+    elif format_string == 'schar':
+        return unpack('<b', ''.join([chr(x) for x in data]))[0]    
     
     elif format_string == 'hex':
         return ' '.join(['%02X' % x for x in data])  
