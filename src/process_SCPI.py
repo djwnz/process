@@ -14,56 +14,77 @@
 Module to handle sending and processing of scpi commands within process
 """
 
-__author__ = 'David Wright (david@pumpkininc.com)'
+__author__ = 'David Wright (david@asteriaec.com)'
 __version__ = '0.1.0' #Versioning: http://www.python.org/dev/peps/pep-0386/
+
+#
+# -------
+# Imports
 
 import aardvark_py
 import time
 from array import array
 from struct import unpack
 
+#
 # ---------
 # Constants
 
-# I2C config
-I2C = True
-SPI = True
-GPIO = False
-Pullups = True
-radix = 16
-Bitrate = 100
+# I2C Bitrate
+_Bitrate = 100
+
+#
+# ---------
+# Classes
 
 class aardvark:
+    """
+    Class that operates the Aardvark device
+    
+    @attribute message      (string) Place to store error messages
+    @attribute port         (Aardvark_py.Aardvark handle) 
+                                     The aardvark port in use
+    @attribute name_size    (int)    The length of a name request in bytes
+    @attribute chksum_size  (int)    The length of the checksum in bytes
+    @attribute wflag_size   (int)    The length of the write flag in bytes
+    @attribute time_size    (int)    The length of the timestamp in bytes
+    @attribute ascii_size   (int)    The length of an ascii read in bytes
+    """ 
     
     def __init__(self):
-        
+        """
+        Initialise the aardvark object to its default values
+        """
         self.message = ''
         
         # configure Aardvark if available
         self.port = self.configure_aardvark()
         
-        # The length of a name request in bytes
         self.name_size = 32
         
-        # The length of the checksum in bytes
         self.chksum_size = 0
         
-        # The length of the write flag element in bytes
         self.wflag_size = 1
         
-        # The length of the timestamp in bytes
         self.time_size = 4
         
-        # The leght of an ascii request in bytes
         self.ascii_size = 128 
         
     #end def
     
     def __enter__(self):
+        """
+        For use with the 'with' operator
+        """   
         return self
     # end def
     
     def __exit__(self, type, value, traceback):
+        """
+        Ensures that the aardvark port is closed correctly
+        
+        For use with the 'with' operator
+        """      
         if self.port != None:
             aardvark_py.aa_close(self.port)
         #end if
@@ -126,7 +147,7 @@ class aardvark:
                                       aardvark_py.AA_I2C_PULLUP_BOTH)
             
             # set the bit rate to be the default
-            aardvark_py.aa_i2c_bitrate(Aardvark_in_use, Bitrate)
+            aardvark_py.aa_i2c_bitrate(Aardvark_in_use, _Bitrate)
             
             # free the bus
             aardvark_py.aa_i2c_free_bus(Aardvark_in_use)
@@ -173,7 +194,7 @@ class aardvark:
         @param[in]    address:         the decimal address to write to (int)
         @param[out]   result:          the variable to store the data in
         """  
-        # acceptible data formats
+        # dictionary of acceptible data formats and their lengths
         acceptible_formats = {'int':2, 'long':4, 'long long':8, 'uint':2, 
                               'double':8, 'float':4, 'char':1, 'schar':1, 
                               'hex':1, 'name':self.name_size, 
@@ -236,6 +257,7 @@ class aardvark:
                                                 aardvark_py.AA_I2C_NO_FLAGS, 
                                                 data) 
             
+            # convert data to alist
             raw_data = list(read_data[1])
             
             # pause
@@ -252,7 +274,7 @@ class aardvark:
                 for item in return_format:
                     # extract each item individually and append to list
                     return_list = return_list + \
-                        [extract_data(data[0:accptiable_formats[item]], item)]
+                        [_extract_data(data[0:accptiable_formats[item]], item)]
                     
                     # shorten data list to what remains
                     data = data[acceptiable_formats[item]:]
@@ -265,7 +287,7 @@ class aardvark:
                 if return_format != 'ascii':
                     data = raw_data[preamble_length:]
                 # end if
-                return extract_data(data, return_format)
+                return _extract_data(data, return_format)
             #end if
             
         # end if
@@ -274,8 +296,20 @@ class aardvark:
         return None
     # end def    
 # end class
+       
         
-def extract_data(data, format_string):
+#
+# ----------------
+# Private Functions 
+
+        
+def _extract_data(data, format_string):
+    """
+    Function to parse data recieved from a SCPI command
+
+    @param[in]    data:            The data to parse (list of bytes)
+    @param[in]    format_string    The format to parse it as (string)
+    """      
     if format_string in ['ascii', 'string', 'name']:
         if 0 in data:
             # terminate printing at the null terminator 
@@ -315,7 +349,7 @@ def extract_data(data, format_string):
     
 #end def
     
-def test():
+def _test():
     """
     Test code for this module.
     """
@@ -358,5 +392,5 @@ def test():
 
 if __name__ == '__main__':
     # if this code is not running as an imported module run test code
-    test()
+    _test()
 # end if
