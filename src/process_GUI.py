@@ -63,7 +63,7 @@ class process_window:
                                                object containing properties of 
                                                the process
                                   .process     list of process steps
-    """         
+       """         
         if input_struct == None:
             #this is a testing code implementation, use the testing struct
             input_struct = _test_struct()

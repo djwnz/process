@@ -389,6 +389,200 @@ class _BM2_heater_test:
     #end def
 #end class   
 
+class _Calibrate_Temp:
+    """
+    Class that manages calibrating the BM2 temperature sensors
+
+    @attribute properties    (SUP_process.process_properties) 
+                                          Denotes propeties of the step
+    @attribute title          (String)    Title text to display
+    @attribute text           (String)    Body text to display
+    @attribute Header         (TK label)  The title as displayed in the GUI
+    @attribute body           (TK label)  Body text display in GUI
+    @attribute error_label    (TK label)  Text to display if there is an error
+    @attribute no_aardvark    (bool)      True is a connection to an aardvark 
+                                          has been made, False otherwise.
+    @attribute temp_label     (TK label)  Temperature title
+    @attribute temp           (TK Entry)  Temperature display
+    @attribute cal_button     (TK Button) Button to start the calibration.
+    """     
+    def __init__(self, properties):
+        """
+        Initialise the Temperature calibration class
+    
+        @param  properties   (SUP_process.process_properties) 
+                                             Denotes propeties of the step
+        """        
+        # define the title of the step
+        self.title = "Calibrate the BM2 Temperature sensors"
+        
+        # define the body text for the step
+        self.text = "Enter the current abbient temperature in the box below\n" +\
+                    "Ensure that the battery has been at rest for at least an\n" +\
+                    "hour before performing calibration.\n NOTE: This" +\
+                    "calibration on calibrates the sensors managed by the\n" +\
+                    "supMCU, the BQ temp sensors must be calibrated separately"
+        
+        # initialise attributes 
+        self.no_aardvark = False
+        
+        # copy the properties
+        self.properties = properties
+    # end def
+    
+    def execute(self):
+        """
+        The code to run for this step:
+    
+        Check for a present Aardvark
+        """         
+        with process_SCPI.aardvark() as AARD:
+            # initialise the aardvark
+            if AARD.port != None:
+                # if an aardvark was found, do nothing
+                next
+                
+            else:
+                # no aardvark was found
+                self.no_aardvark = True
+            #end if
+        # end with
+    # end def
+    
+    def gui(self, parent_frame):
+        """
+        Load the GUI for this step
+    
+        @param parent_frame  (TK Frame)   The GUI frame to load the gui into
+        """
+        # the step title          
+        self.Header = TK.Label(parent_frame, text = self.title)
+        self.Header.config(font = process_GUI.title_font, 
+                           bg = process_GUI.default_color)
+        self.Header.grid(row = 0, column=0, columnspan = 2, sticky = 'nsew')
+        
+        # the body text for the step
+        self.body = TK.Label(parent_frame, text = self.text)
+        self.body.config(font = process_GUI.label_font, 
+                           bg = process_GUI.default_color)
+        self.body.grid(row = 1, column=0, columnspan = 2, sticky = 'nsew')          
+        
+        if self.no_aardvark:
+            # if arrdvark communications were unsuccessful print an error
+            self.error_label = TK.Label(parent_frame, 
+                                        text = "No Aardvark Connected")
+            self.error_label.config(font = process_GUI.label_font, 
+                                 bg = process_GUI.default_color)
+            self.error_label.grid(row = 2, column=0, columnspan = 2)   
+        
+        else:
+            # Aardvark communications were successful so load the rest of the GUI
+        
+            # Tuning Parameter title          
+            self.param_label = TK.Label(parent_frame, 
+                                         text = "Tuning Parameter:")
+            self.param_label.config(font = process_GUI.label_font, 
+                                 bg = process_GUI.default_color)
+            self.param_label.grid(row = 2, column=0, sticky = 'e')
+            
+            # Tuning Parameter display
+            self.param = TK.Entry(parent_frame, justify = 'left', width = 7)
+            self.param.config(font = process_GUI.text_font, 
+                                highlightbackground= process_GUI.default_color)
+            self.param.grid(row = 2, column = 1, ipady = 3, sticky = 'w')    
+            self.param.insert(0, str(self.tuning_param))
+            
+            # parameter setting starting button
+            self.update_button = TK.Button(parent_frame, text = 'Update', 
+                                         command = partial(self.update_command, 
+                                                           self), 
+                                         activebackground = 'green', width = 15)
+            self.update_button.config(font = process_GUI.button_font, 
+                                      bg = process_GUI.default_color, 
+                                    highlightbackground= process_GUI.default_color)
+            self.update_button.grid(row = 3, column=0, columnspan = 2,
+                                    padx=10, pady=10)     
+        #end if
+    #end def
+    
+    def close(self):
+        """
+        Deconstruct the GUI for this step
+        """        
+        # remove the fixed items        
+        self.Header.grid_forget()
+        self.body.grid_forget()
+        
+        if self.no_aardvark:
+            # if an aardvark was not found remove the error label
+            self.error_label.grid_forget()
+            
+        else:
+            # if an aardvark was found remove all other items
+            self.param_label.grid_forget()
+            self.param.grid_forget()
+            self.update_button.grid_forget()
+        # end if
+    #end def
+    
+    def get_param(self):
+        """
+        Function to find the desired tuning parameter that was entered 
+        in the gui.
+        
+        @return     (int)         The tuning parameter that will be set.
+        """        
+        # read the parameter from the gui
+        param_text = self.param.get()
+        # verify if the parameter is valid
+        try:
+            int(param_text)
+            # is a good parameter so set it as the parameter time
+            return param_text
+            
+        except ValueError:
+            # the parameter is not valid
+            print '*** Requested Tuning Parameter is not valid, '\
+                  'reverting to default ***'
+            # restore the default parameter
+            return '0'
+        # end if    
+    # end def    
+    
+    def update_command(self, event):
+        """
+        Function that gets called when the update button is pressed. 
+        
+        Updates the oscillator tuning parameter
+        """
+        # read the desired parameter from the GUI
+        param_text = self.get_param()
+        
+        with process_SCPI.aardvark() as AARD:
+            # initialise the aardvark
+            if AARD.port != None:
+                # if an aardvark was found, extract the device NVM key.
+                nvm_key = AARD.read_SCPI("SUP:TEL? 9,data", 
+                                         self.properties.address, "uint")+12345   
+                
+                # unlock the module NVM, set the tuning parameter and write it 
+                # to the NVM
+                AARD.send_SCPI("SUP:NVM UNLOCK,"+str(nvm_key), 
+                               self.properties.address)
+                AARD.send_SCPI("SUP:NVM OSCTUN,"+param_text, 
+                               self.properties.address)
+                AARD.send_SCPI("SUP:NVM WRITE,1", 
+                               self.properties.address)
+                
+            else:
+                # no aardvark was found
+                self.no_aardvark = True
+            #end if
+        # end with
+    #end def
+#end class 
+
+
 class BM2_Process(object):
     """
     The class that represents the BM2 Process
