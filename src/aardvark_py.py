@@ -65,10 +65,16 @@ except ImportError, ex1:
     try:
         api = imp.load_dynamic('aardvark', 'src/' + 'aardvark' + ext) # Modified By David - Pumpkin Space Systems
     except ImportError, ex2:
-        import_err_msg  = 'Error importing aardvark%s\n' % ext
-        import_err_msg += '  Architecture of aardvark%s may be wrong\n' % ext
-        import_err_msg += '%s\n%s' % (ex1, ex2)
-        raise ImportError(import_err_msg)
+        try: 
+            api = imp.load_dynamic('aardvark', 'aardvark' + ext) # Modified By David - Pumpkin Space Systems
+        except ImportError, ex2:  
+            try: 
+                api = imp.load_dynamic('aardvark', '../src/aardvark' + ext) # Modified By David - Pumpkin Space Systems
+            except ImportError, ex2:              
+                import_err_msg  = 'Error importing aardvark%s\n' % ext
+                import_err_msg += '  Architecture of aardvark%s may be wrong\n' % ext
+                import_err_msg += '%s\n%s' % (ex1, ex2)
+                raise ImportError(import_err_msg)
 
 AA_SW_VERSION      = api.py_version() & 0xffff
 AA_REQ_API_VERSION = (api.py_version() >> 16) & 0xffff

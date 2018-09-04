@@ -218,7 +218,7 @@ class aardvark:
             for item in return_format:
                 # ensure each format specifier is acceptible
                 if item in acceptible_formats:
-                    read_length += acceptible_formats(item)
+                    read_length += acceptible_formats[item]
                     
                 else:
                     # error
@@ -274,10 +274,10 @@ class aardvark:
                 for item in return_format:
                     # extract each item individually and append to list
                     return_list = return_list + \
-                        [_extract_data(data[0:accptiable_formats[item]], item)]
+                        [_extract_data(data[0:acceptible_formats[item]], item)]
                     
                     # shorten data list to what remains
-                    data = data[acceptiable_formats[item]:]
+                    data = data[acceptible_formats[item]:]
                 # end for
                 
                 return return_list

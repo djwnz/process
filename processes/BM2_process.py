@@ -30,6 +30,7 @@ import process_SCPI
 import process_GUI
 import time
 import SUP_process
+import BM2_flash
 
 #
 # -------
@@ -600,9 +601,11 @@ class BM2_Process(object):
     # initialise the BM2 process steps
     __verification = _BM2_verification(properties)
     __heater_test = _BM2_heater_test(properties)
+    __update_flash = BM2_flash.Update_Flash(properties)
     
     # construct the list of steps in the process
-    process = __sup_process.process + \
-             [__verification,
-              __heater_test]     
+    #process = __sup_process.process + \
+    #         [__verification,
+    #          __heater_test]     
+    process = [__update_flash]
 #end object
