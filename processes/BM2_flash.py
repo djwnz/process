@@ -32,6 +32,7 @@ import process_GUI
 import time
 import os
 import openpyxl
+import csv
 
 
 #
@@ -55,7 +56,7 @@ class Flash_Subclass:
     @attribute length      (int)  Length of the data contained within this page.
     @attribute data        (list) Bytes that contain the data flash information.
     """ 
-    def __init__(self, subclass_ID):
+    def __init__(self, subclass_ID, subclass_data = []):
         """
         Initialise the class.
         
@@ -63,8 +64,15 @@ class Flash_Subclass:
         @param  page_number   (int) the page within the subclass
         """
         self.subclassID = subclass_ID
-        self.length = 0
-        self.data = []
+        
+        if subclass_data == []:
+            self.length = 0
+            self.data = []
+            
+        else:
+            self.length = len(subclass_data)
+            self.data = subclass_data
+        # end if
     # end def
     
     def copy(self):
@@ -75,10 +83,7 @@ class Flash_Subclass:
         """
         
         # create a new Flash_page entity
-        return_page = Flash_Subclass(self.subclassID)
-        
-        # append all of the data to it
-        return_page.append(self.data)
+        return_page = Flash_Subclass(self.subclassID, self.data)
         
         # if the data was written to it correctly
         if (return_page.length == self.length):
@@ -225,7 +230,7 @@ class Flash_Page:
     @attribute length      (int)  Length of the data contained within this page.
     @attribute data        (list) Bytes that contain the data flash information.
     """ 
-    def __init__(self, subclass_ID, page_number):
+    def __init__(self, subclass_ID, page_number, page_data = []):
         """
         Initialise the class.
         
@@ -234,8 +239,15 @@ class Flash_Page:
         """
         self.subclassID = subclass_ID
         self.page_number = page_number
-        self.length = 0
-        self.data = []
+        
+        if page_data == []:
+            self.length = 0
+            self.data = []
+            
+        else:
+            self.length = len(page_data)
+            self.data = page_data
+        # end if
     # end def
     
     def copy(self):
@@ -246,10 +258,7 @@ class Flash_Page:
         """
         
         # create a new Flash_page entity
-        return_page = Flash_Page(self.subclassID, self.page_number)
-        
-        # append all of the data to it
-        return_page.append(self.data)
+        return_page = Flash_Page(self.subclassID, self.page_number, self.data)
         
         # if the data was written to it correctly
         if (return_page.length == self.length):
@@ -400,15 +409,150 @@ class Update_Flash:
         
     # end def
     
+    def disable_buttons(self):
+        """
+        Disable all buttons.
+        """
+        self.load_button.config(state = 'disabled')
+        self.write_button.config(state = 'disabled')
+        self.read_button.config(state = 'disabled')  
+        self.parse_button.config(state = 'disabled')
+        self.save_button.config(state = 'disabled')
+    # end def
+    
+    def load_csv(self):
+        """
+        Load saved data flash dictionary from a saved csv file
+        """  
+        
+        # prepare to open a window to load a file through
+        file_opt = options = {}
+        options['defaultextension'] = '.csv'
+        options['filetypes'] = [('csv files', '.csv')]
+        options['initialdir'] = os.getcwd()
+        options['title'] = 'Select .csv file to open' 
+              
+        # open window to fet filename to open
+        filename = TKFD.askopenfilename(**file_opt)   
+        
+        # see if the user selected a file or not
+        if (filename != ''):  
+            try:
+                # open the csv file
+                csv_input = open(filename, 'wb')
+                
+                first_line = csv_inpt.readline()
+                
+                if (first_line == "# Published through BM2_flash.py"):
+                    # file is compatible with this program
+                    
+                    # define csv reader object
+                    reader = csv.reader(csv_input, delimeter = '/t')
+                    
+                    # empty the read dictionary
+                    self.read_flash_pages = {}
+                    
+                    for row in reader:
+                        if row[0] == 'Subclass ID':
+                            # this is the header row
+                            next
+                            
+                        else:
+                            # this is a data row so store the data
+                            self.read_flash_pages[str(row[0])] = Flash_Subclass(row[0], row[2:])
+                        # end if
+                    # end for
+                    
+                else:
+                    print "This csv file is not compatible with this program"
+                # end if
+                
+                csv_input.close()
+                
+                self.parse_button.config(state = 'normal')
+                self.save_button.config(state = 'normal')
+            
+            except:
+                print "Could not open and read to the csv file"
+            # end try
+        
+        else:
+            print "No file was selected to write to"
+        # end if
+    # end def            
+    
+    def save_csv(self):
+        """
+        Saves the loaded data flash to a csv file. If as excel file has not been
+        parsed then it will save the read data flash. Otherwise it will save the
+        Parsed data flash
+        """      
+        
+        # open window for saving the file
+        file_opt = options = {}
+        options['defaultextension'] = '.csv'
+        options['filetypes'] = [('csv files', '.csv')]
+        options['initialdir'] = os.getcwd()
+        options['initialfile'] = 'test.csv'
+        options['title'] = 'Save .csv file as:'     
+        
+        # get the file name from the user
+        filename = TKFD.asksaveasfilename(**file_opt)
+        
+        # see if the user selected a file or not
+        if (filename != ''):    
+            # a file was selected so open file for writing   
+            try:
+                # open the csv file
+                csv_output = open(filename, 'wb')
+                
+                # write a comment line
+                csv_output.write("# Published through BM2_flash.py\n")
+                
+                # define a csv writer object
+                output_writer = csv.writer(csv_output, delimiter = '\t')
+                
+                # write the title
+                output_writer.writerow(["Subclass ID", "Length", "Data Array ->"])
+                
+                if self.parsed_flash_pages.keys() == []:
+                    # the parsed dictionary is empty
+                    key_list = sorted_key_list(self.read_flash_pages)
+                    
+                    for key in key_list:
+                        output_writer.writerow(self.read_flash_pages[key].to_list())
+                    # end for
+                    
+                else:
+                    key_list = sorted_key_list(self.parsed_flash_pages)
+                    
+                    for key in key_list:
+                        output_writer.writerow(self.parsed_flash_pages[key].to_list())
+                    # end for          
+                # end if
+                
+                csv_output.close() 
+                
+            except:
+                print "Could not open and write to the csv file"
+            # end try
+            
+        else:
+            print "No file was selected to write to"
+        # end if
+    # end def
+    
     def write_data_flash(self):
         """
         Write the data flash subclasses to the gas gauge
         """
+        
+        self.disable_buttons()
+        
         # initialise the list of 
         pages_to_write = []
         
-        keylist = self.parsed_flash_pages.keys()
-        keylist.sort()
+        keylist = sorted_key_list(self.parsed_flash_pages)
 
         for key in keylist:
             pages_to_write.extend(self.parsed_flash_pages[key].to_pages())
@@ -417,6 +561,13 @@ class Update_Flash:
         for page in pages_to_write:
             print page.to_list()
         # end for
+        
+        # re-enable buttons
+        self.parse_button.config(state = 'normal')
+        self.save_button.config(state = 'normal')
+        self.load_button.config(state = 'normal')
+        self.write_button.config(state = 'normal')
+        self.read_button.config(state = 'normal')      
     # end def
             
     
@@ -425,9 +576,7 @@ class Update_Flash:
         Read the data flash from the gas gauge
         """
         
-        self.load_button.config(state = 'disabled')
-        self.write_button.config(state = 'disabled')
-        self.read_button.config(state = 'disabled')        
+        self.disable_buttons()
         
         for ID in DATA_FLASH_IDS:
             current_page = 1
@@ -520,10 +669,7 @@ class Update_Flash:
         pages to write to the gas gauge data flash
         """
         
-        # disable the buttons
-        self.load_button.config(state = 'disabled')
-        self.write_button.config(state = 'disabled')
-        self.read_button.config(state = 'disabled')
+        self.disable_buttons()
         
         # copy the data flash list
         for key in self.read_flash_pages:
@@ -721,8 +867,7 @@ class Update_Flash:
             # end while
         # end for
         
-        keylist = self.read_flash_pages.keys()
-        keylist.sort()
+        keylist = sorted_key_list(self.read_flash_pages)
         
         for key in keylist:
             if not self.read_flash_pages[key].is_equal(self.parsed_flash_pages[key]):
@@ -870,11 +1015,17 @@ class Update_Flash:
                            bg = process_GUI.default_color)
         self.body.grid(row = 1, column=0, columnspan = 2, sticky = 'nsew')
         
-        # button to trigger reading of dataflash to the gas gauge
+        # button to trigger reading of dataflash from the gas gauge
         self.read_button = TK.Button(parent_frame, text = 'Read Data Flash', 
                                           command = self.read_data_flash, 
                                           activebackground = 'green', width = 15)
-        self.read_button.grid(row = 2, column = 0, columnspan = 2, sticky = 'nsew')           
+        self.read_button.grid(row = 2, column = 0, sticky = 'nsew')      
+        
+        # button to trigger loading of dataflash from a csv file
+        self.load_button = TK.Button(parent_frame, text = 'Load Data Flash', 
+                                          command = self.load_csv, 
+                                          activebackground = 'green', width = 15)
+        self.load_button.grid(row = 2, column = 1, sticky = 'nsew')         
         
         # checkbox to determine if lifetime data should be erased
         self.lifetime_erase = TK.IntVar()
@@ -889,18 +1040,25 @@ class Update_Flash:
         self.cal_checkbox.grid(row = 4, column = 0, columnspan = 2, sticky = 'nsew')
         
         # the button to trigger loading of information from the excel file
-        self.load_button = TK.Button(parent_frame, text = 'Load Excel File', 
+        self.parse_button = TK.Button(parent_frame, text = 'Load Excel File', 
                                          command = self.read_flash_excel, 
                                          activebackground = 'green', width = 15,
                                          state = 'disabled')
-        self.load_button.grid(row = 5, column = 0, columnspan = 2, sticky = 'nsew')        
+        self.parse_button.grid(row = 5, column = 0, columnspan = 2, sticky = 'nsew')        
         
         # button to trigger writing of dataflash to the gas gauge
         self.write_button = TK.Button(parent_frame, text = 'Write Data Flash', 
                                      command = self.write_data_flash, 
                                      activebackground = 'green', width = 15,
                                      state = 'disabled')
-        self.write_button.grid(row = 6, column = 0, columnspan = 2, sticky = 'nsew')        
+        self.write_button.grid(row = 6, column = 0, sticky = 'nsew')  
+        
+        # button to trigger saving of dataflash to a csv file
+        self.save_button = TK.Button(parent_frame, text = 'Save Data Flash', 
+                                     command = self.save_csv, 
+                                     activebackground = 'green', width = 15,
+                                     state = 'disabled')
+        self.save_button.grid(row = 6, column = 1, sticky = 'nsew')         
         
         # This check is only required if the step 
         # requires the use of the arrdvark
@@ -929,6 +1087,8 @@ class Update_Flash:
         self.lifetime_checkbox.grid_forget()
         self.write_button.grid_forget()
         self.read_button.grid_forget()
+        self.save_button.grid_forget()
+        self.parse_button.grid_forget()
         
         if self.no_aardvark:
             # if an aardvark was not found remove the error label
@@ -942,3 +1102,40 @@ class Update_Flash:
         # end if
     #end def
 #end class
+
+def sorted_key_list(input_dict):
+    """ 
+    Function to sort the keys of a dictionary into numerical order.
+    
+    @param    input_dict   (Dictionary)   The dictionary to sort.
+    @return   (list)                The orted list of keys.
+    """
+    
+    # define relevant lists
+    number_list = []
+    key_list = input_dict.keys()
+    bad_key_list = []
+    
+    # terate through the keys and convert to integers
+    for key in key_list:
+        try:
+            number_list.append(int(key))
+        
+        except:
+            print key + ' is not a valid number to sort'
+            bad_key_list.append(key)
+        # end try
+    # end for
+    
+    #sort the list
+    number_list.sort()
+    
+    # convert back to strings
+    key_list = [str(number) for number in number_list]
+    
+    # add the bad keys
+    key_list.extend(bad_key_list)
+    
+    return key_list
+# end def
+            
