@@ -36,7 +36,184 @@ import openpyxl
 
 #
 # -------
+# Constants
+DATA_FLASH_IDS = [0,1,2,4,16,17,18,19,20,21,32,33,34,36,37,38,39,48,49,56,58,59,
+                  60,64,65,67,68,80,81,82,88,89,90,91,92,93,94,95,96,97,104,
+                  105,106,107]
+
+
+#
+# -------
 # Classes
+
+class Flash_Subclass:
+    """
+    Class contianing all of the information needed to define a subclass in the data 
+    flash.
+    
+    @attribute subclassID  (int)  Subclass ID of this flash item.
+    @attribute length      (int)  Length of the data contained within this page.
+    @attribute data        (list) Bytes that contain the data flash information.
+    """ 
+    def __init__(self, subclass_ID):
+        """
+        Initialise the class.
+        
+        @param  subclass_ID   (int) the subclass ID of the page
+        @param  page_number   (int) the page within the subclass
+        """
+        self.subclassID = subclass_ID
+        self.length = 0
+        self.data = []
+    # end def
+    
+    def copy(self):
+        """ 
+        Return a copy of the flash page
+        
+        @return   (Flash_Page)   a copy of this page.
+        """
+        
+        # create a new Flash_page entity
+        return_page = Flash_Subclass(self.subclassID)
+        
+        # append all of the data to it
+        return_page.append(self.data)
+        
+        # if the data was written to it correctly
+        if (return_page.length == self.length):
+            # return the page
+            return return_page
+        
+        else:
+            # there was an issue
+            print 'Missmatched data lengths'
+            return None
+        # end if
+    # end def
+    
+    def insert(self, offset, data):
+        """ 
+        Insert data into the subclass at a given offset
+        
+        @param    offset   (int)    The offset in the subclass to write to
+        @param    data     (list)   The data to write
+        """
+        for item in data:
+            try:
+                self.data[offset] = item
+            
+            except:
+                print str(self.subclassID) + ', offset ' + str(offset) + ' is an overrun'
+            # end try
+            offset += 1
+        # end for
+    # end def
+    
+    def to_pages(self):
+        """
+        Convert the subclass to a list of pages to be written to data flash
+        
+        @return   (list)    list of Flash_Pages that make up the subclass
+        """
+        
+        # initialise the return list
+        return_pages = []
+               
+        # dummy variable to manage the length
+        remaining_length = self.length
+        current_page = 1;
+        
+        # store all the pages
+        while remaining_length > 32:
+            # initialise the flash page
+            new_page = Flash_Page(self.subclassID, current_page)
+            
+            # define the indicies for the data
+            start_index = (current_page-1)*32
+            end_index = start_index + 32
+            
+            # add the data to the page
+            new_page.append(self.data[start_index:end_index])
+            
+            # store the page
+            return_pages.append(new_page)
+            
+            # 
+            current_page += 1
+            remaining_length -= 32
+        # end while
+        
+        # initialise the flash page
+        new_page = Flash_Page(self.subclassID, current_page)
+        
+        # define the indicies for the data
+        start_index = (current_page-1)*32
+        
+        # add the data to the page
+        new_page.append(self.data[start_index:])
+        
+        # store the page
+        return_pages.append(new_page)       
+        
+        return return_pages
+    # end def
+    
+    def is_equal(self, other_page):
+        """
+        determine if this page is equal to the other page provided.
+        
+        @param   other_page (Flash_Page)   The other page to compare to.
+        @return  (bool)                    True if the classes are equal.
+        """
+        
+        # compare subclass IDs
+        if self.subclassID != other_page.subclassID:
+            return False
+        
+        # compare lengths
+        elif self.length != other_page.length:
+            return False
+        
+        # compare the length of data lists
+        elif len(self.data) != len(other_page.data):
+            return False
+        # end if
+        
+        # iterate through data elements comparing values
+        for i in range(len(self.data)):
+            if self.data[i] != other_page.data[i]:
+                return False
+            # end if
+        # end for
+        
+        # If it makes it here then the pages are equal.
+        return True
+    # end def
+    
+    def append(self, additional_data):
+        """
+        Append new data to the page
+        
+        @param    additional_data  (list)  The list of bytes to append
+        @return   (list)                   Any overflowing data, 
+                                           None if there is none.
+        """
+    
+        # determine the number of bytes the new data contains
+        additional_length = len(additional_data)
+        
+        self.length += additional_length
+        self.data.extend(additional_data)
+    # end def
+    
+    def to_list(self):
+        """
+        Function to convert the page to a list for veiwing.
+        """
+        return [self.subclassID, self.length] + [self.data]
+    # end def
+# end class
 
 class Flash_Page:
     """
@@ -59,6 +236,31 @@ class Flash_Page:
         self.page_number = page_number
         self.length = 0
         self.data = []
+    # end def
+    
+    def copy(self):
+        """ 
+        Return a copy of the flash page
+        
+        @return   (Flash_Page)   a copy of this page.
+        """
+        
+        # create a new Flash_page entity
+        return_page = Flash_Page(self.subclassID, self.page_number)
+        
+        # append all of the data to it
+        return_page.append(self.data)
+        
+        # if the data was written to it correctly
+        if (return_page.length == self.length):
+            # return the page
+            return return_page
+        
+        else:
+            # there was an issue
+            print 'Missmatched data lengths'
+            return None
+        # end if
     # end def
     
     def is_equal(self, other_page):
@@ -190,60 +392,91 @@ class Update_Flash:
         # initialise the name of the configuration to use
         self.configuration = ''
         
-        # initialise the list of parsed flash pages
-        self.parsed_flash_pages = []
+        # initialise the dict of parsed flash pages
+        self.parsed_flash_pages = {}
         
-        # initialise the list of read flash pages
-        self.read_flash_pages = []    
+        # initialise the dict of read flash pages
+        self.read_flash_pages = {}    
         
     # end def
+    
+    def write_data_flash(self):
+        """
+        Write the data flash subclasses to the gas gauge
+        """
+        # initialise the list of 
+        pages_to_write = []
+        
+        keylist = self.parsed_flash_pages.keys()
+        keylist.sort()
+
+        for key in keylist:
+            pages_to_write.extend(self.parsed_flash_pages[key].to_pages())
+        # end for
+        
+        for page in pages_to_write:
+            print page.to_list()
+        # end for
+    # end def
+            
     
     def read_data_flash(self):
         """
         Read the data flash from the gas gauge
         """
         
-        for page in self.parsed_flash_pages:
-            recieved_page = self.read_BM2_page(page)
+        self.load_button.config(state = 'disabled')
+        self.write_button.config(state = 'disabled')
+        self.read_button.config(state = 'disabled')        
+        
+        for ID in DATA_FLASH_IDS:
+            current_page = 1
             
-            if page.is_equal(recieved_page):
-                print 'Subclass ' + str(page.subclassID) + ' page ' + str(page.page_number) + ' is correct!'
-                
-            elif page.subclassID == 59:
-                # is lifetime data
-                print "is lifetime data"
-                print '\tExcel Page = ' + str(page.to_list())
-                print '\tBM2 Page   = ' + str(recieved_page.to_list())                
-                
+            recieved_subclass = Flash_Subclass(ID)
+            
+            recieved_page = self.read_BM2_page(ID, current_page)
+            
+            if (recieved_page.length == 0):
+                # catch for empty pages
+                pass
+            
             else:
-                print 'Subclass ' + str(page.subclassID) + ' page ' + str(page.page_number) + ' does not match'
-                print '\tExcel Page = ' + str(page.to_list())
-                print '\tBM2 Page   = ' + str(recieved_page.to_list())
-                
-                while recieved_page.length == 32 and page.length != 32:
-                    # look for extra pages
-                    recieved_page.page_number += 1
-                    recieved_page = self.read_BM2_page(recieved_page)
-                    
-                    if recieved_page.length != 0:
-                        print "There is an extra page in this subclass"
-                        print '\tBM2 Page   = ' + str(recieved_page.to_list())
-                    # end if
-                # end while
+                # store the page
+                recieved_subclass.append(recieved_page.data)
             # end if
-        # end for
-    # end def            
-               
             
-    def read_BM2_page(self, page):
+            while recieved_page.length == 32:
+                # look for extra pages
+                current_page += 1
+                recieved_page = self.read_BM2_page(ID, current_page)
+                
+                if (recieved_page.length == 0):
+                    # catch for empty pages
+                    pass
+                
+                else:
+                    # store the page
+                    recieved_subclass.append(recieved_page.data)
+                # end if
+            # end while
+            self.read_flash_pages[str(ID)] = recieved_subclass
+        # end for
+        
+        self.load_button.config(state = 'normal')
+        self.read_button.config(state = 'normal')        
+    # end def
+    
+    def read_BM2_page(self, ID, page):
         """
         Read a page of data from the BM2
         
-        @param    page   (Flash_Page)   The data page to mirror
+        @param    ID      (int)         The subclass ID to read
+        @param    page    (int)         The page within that subclass to read
         @return   (Flash_Page)          The recieved data
         """
+        
         # initialise the page
-        read_page = Flash_Page(page.subclassID, page.page_number)
+        read_page = Flash_Page(ID, page)
         
         # define the SPCI command to send
         SCPI_command = "BM2:BQF READ_PAGE," + str(read_page.subclassID) + ',' + str(read_page.page_number)
@@ -263,17 +496,22 @@ class Update_Flash:
                                              33*['char'])
                 
                 # extract the data from the result
-                read_page.length = page_data[0]
-                read_page.data = [str(item) for item in page_data[1:read_page.length+1]]
+                
+                if page_data != None:
+                    # the read was successful
+                    read_page.length = page_data[0]
+                    read_page.data = [str(item) for item in page_data[1:read_page.length+1]]
+                # end if                   
                 
             else:
                 # no aardvark was found
                 self.no_aardvark = True
+                
             #end if
         # end with 
         
         return read_page
-    # end def
+    # end def    
         
     
     def read_flash_excel(self):
@@ -285,6 +523,12 @@ class Update_Flash:
         # disable the buttons
         self.load_button.config(state = 'disabled')
         self.write_button.config(state = 'disabled')
+        self.read_button.config(state = 'disabled')
+        
+        # copy the data flash list
+        for key in self.read_flash_pages:
+            self.parsed_flash_pages[key] = self.read_flash_pages[key].copy()
+        # end for      
         
         # get the filename of the excel spreadsheet to parse
         self.get_filename()
@@ -313,6 +557,7 @@ class Update_Flash:
         # re-enable the buttons
         self.load_button.config(state = 'normal')
         self.write_button.config(state = 'normal')
+        self.read_button.config(state = 'normal')
     # end def
     
     def get_flash_configuration(self, workbook):
@@ -405,6 +650,8 @@ class Update_Flash:
             format_column = header_titles.index('Format')
             size_column = header_titles.index('Size')
             data_column = header_titles.index(self.configuration)
+            type_column = header_titles.index('Type')
+            offset_column = header_titles.index('Offset')
             
             # initialise variables
             row_to_parse = 2
@@ -440,57 +687,52 @@ class Update_Flash:
                 data_format = row[format_column]
                 data_size = row[size_column]
                 data = row[data_column]
+                data_type = row[type_column]
+                offset = row[offset_column]
                 
                 if ((type(subclass_ID) != int) or 
                     (type(data_size) != int) or 
+                    (type(offset) != int) or 
                     (type(data_format) != str)):
                     
                     # this row has in-valid data, this worksheet is finished
                     data_valid = False
                     
-                    # append the finished sheet to the list
-                    self.parsed_flash_pages.append(parsing_page)
                     break
                 # end try
-                
-                # if the subclass ID has changed since the last row.
-                if subclass_ID != current_subclass_ID:
-                    # update the subclass ID and page numbers
-                    current_subclass_ID = subclass_ID
-                    current_page = 1
+
+                # check if this data item is protected
+                if ((data_type == 'Unknown') or
+                    (data_type == 'Lifetime' and not self.lifetime_erase.get()) or
+                    (data_type == 'Calibration' and not self.cal_erase.get())):
+                    next
                     
-                    if parsing_page != None:
-                        # append the finished sheet to the list
-                        self.parsed_flash_pages.append(parsing_page)
-                    # end if
+                else:
+                    # this item is not protected
                     
-                    # create a new page to load data into
-                    parsing_page = Flash_Page(subclass_ID, current_page)
+                    # parse the information from this row into a new data list.
+                    data_list = self.parse_row(data_size, data_format, data)  
+                    
+                    # overrite the previous data
+                    self.parsed_flash_pages[str(subclass_ID)].insert(offset, data_list)
                 # end if
-                
-                # parse the information from this row into a new data list.
-                data_list = self.parse_row(data_size, data_format, data)
-                
-                # add this data to the page and collect any overflow
-                overflow = parsing_page.append(data_list)
-                
-                while overflow != None:
-                    # append the finished sheet to the list
-                    self.parsed_flash_pages.append(parsing_page)
-                    
-                    # increment the page counter
-                    current_page += 1
-                    
-                    # create a new page to load data into
-                    parsing_page = Flash_Page(subclass_ID, current_page)
-                    
-                    # append the remaining data and collect any overflow again
-                    overflow = parsing_page.append(overflow)
-                # end while
                 
                 row_to_parse += 1
             # end while
         # end for
+        
+        keylist = self.read_flash_pages.keys()
+        keylist.sort()
+        
+        for key in keylist:
+            if not self.read_flash_pages[key].is_equal(self.parsed_flash_pages[key]):
+                print "Subclass " + key + " Has Changes" 
+                print "Originally\t= " + str(self.read_flash_pages[key].to_list())
+                print "Now\t\t= " + str(self.parsed_flash_pages[key].to_list())
+                
+            else:
+                print "Subclass " + key + " is unchanged and had length " + str(self.read_flash_pages[key].length)
+            # end if
     # end def
     
     def parse_row(self, size, format_string, data):
@@ -626,13 +868,13 @@ class Update_Flash:
         self.body = TK.Label(parent_frame, text = self.text)
         self.body.config(font = process_GUI.label_font, 
                            bg = process_GUI.default_color)
-        self.body.grid(row = 1, column=0, columnspan = 2, sticky = 'nsew')    
+        self.body.grid(row = 1, column=0, columnspan = 2, sticky = 'nsew')
         
-        # the button to trigger loading of information from the excel file
-        self.load_button = TK.Button(parent_frame, text = 'Load Excel File', 
-                                     command = self.read_flash_excel, 
-                                     activebackground = 'green', width = 15)
-        self.load_button.grid(row = 2, column = 0, columnspan = 2, sticky = 'nsew')
+        # button to trigger reading of dataflash to the gas gauge
+        self.read_button = TK.Button(parent_frame, text = 'Read Data Flash', 
+                                          command = self.read_data_flash, 
+                                          activebackground = 'green', width = 15)
+        self.read_button.grid(row = 2, column = 0, columnspan = 2, sticky = 'nsew')           
         
         # checkbox to determine if lifetime data should be erased
         self.lifetime_erase = TK.IntVar()
@@ -644,14 +886,21 @@ class Update_Flash:
         self.cal_erase = TK.IntVar()
         self.cal_checkbox = TK.Checkbutton(parent_frame, text = 'Erase Calibration Information',
                                                 variable = self.cal_erase)
-        self.cal_checkbox.grid(row = 4, column = 0, columnspan = 2, sticky = 'nsew')        
+        self.cal_checkbox.grid(row = 4, column = 0, columnspan = 2, sticky = 'nsew')
+        
+        # the button to trigger loading of information from the excel file
+        self.load_button = TK.Button(parent_frame, text = 'Load Excel File', 
+                                         command = self.read_flash_excel, 
+                                         activebackground = 'green', width = 15,
+                                         state = 'disabled')
+        self.load_button.grid(row = 5, column = 0, columnspan = 2, sticky = 'nsew')        
         
         # button to trigger writing of dataflash to the gas gauge
         self.write_button = TK.Button(parent_frame, text = 'Write Data Flash', 
-                                     command = self.read_data_flash, 
+                                     command = self.write_data_flash, 
                                      activebackground = 'green', width = 15,
                                      state = 'disabled')
-        self.write_button.grid(row = 5, column = 0, columnspan = 2, sticky = 'nsew')        
+        self.write_button.grid(row = 6, column = 0, columnspan = 2, sticky = 'nsew')        
         
         # This check is only required if the step 
         # requires the use of the arrdvark
@@ -679,6 +928,7 @@ class Update_Flash:
         self.load_button.grid_forget()
         self.lifetime_checkbox.grid_forget()
         self.write_button.grid_forget()
+        self.read_button.grid_forget()
         
         if self.no_aardvark:
             # if an aardvark was not found remove the error label

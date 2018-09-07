@@ -182,7 +182,7 @@ class aardvark:
                                  aardvark_py.AA_I2C_NO_FLAGS, data)
         
         # pause
-        aardvark_py.aa_sleep_ms(400)
+        aardvark_py.aa_sleep_ms(100)
         
     # end def
     
@@ -260,8 +260,14 @@ class aardvark:
             # convert data to alist
             raw_data = list(read_data[1])
             
+            # check the write flag
+            if raw_data[0] == 0:
+                # the write flag indicates a failed transmission
+                return None
+            # end if
+            
             # pause
-            aardvark_py.aa_sleep_ms(400)         
+            aardvark_py.aa_sleep_ms(100)         
             
             # extract the data from the returned raw data
             if type(return_format) == list:
