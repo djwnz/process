@@ -102,7 +102,7 @@ class _BM2_verification:
                                                 self.properties.address, 
                                                 "uint")/100.0
                 self.SOC_read = AARD.read_SCPI("BM2:TEL? 13,data", 
-                                               self.properties.address, "uint")
+                                               self.properties.address, "char")
             else:
                 # no aardvark was found
                 self.no_aardvark = True
@@ -421,8 +421,8 @@ class _Calibrate_Temp:
         self.text = "Enter the current abbient temperature in the box below\n" +\
                     "Ensure that the battery has been at rest for at least an\n" +\
                     "hour before performing calibration.\n NOTE: This" +\
-                    "calibration on calibrates the sensors managed by the\n" +\
-                    "supMCU, the BQ temp sensors must be calibrated separately"
+                    "calibration only calibrates the sensors managed by the\n" +\
+                    "SupMCU, the BQ temp sensors must be calibrated separately"
         
         # initialise attributes 
         self.no_aardvark = False
@@ -481,7 +481,7 @@ class _Calibrate_Temp:
         
             # Tuning Parameter title          
             self.param_label = TK.Label(parent_frame, 
-                                         text = "Tuning Parameter:")
+                                         text = "Temperature (C):")
             self.param_label.config(font = process_GUI.label_font, 
                                  bg = process_GUI.default_color)
             self.param_label.grid(row = 2, column=0, sticky = 'e')
@@ -491,10 +491,10 @@ class _Calibrate_Temp:
             self.param.config(font = process_GUI.text_font, 
                                 highlightbackground= process_GUI.default_color)
             self.param.grid(row = 2, column = 1, ipady = 3, sticky = 'w')    
-            self.param.insert(0, str(self.tuning_param))
+            self.param.insert(0, "25.4")
             
             # parameter setting starting button
-            self.update_button = TK.Button(parent_frame, text = 'Update', 
+            self.update_button = TK.Button(parent_frame, text = 'Calibrate', 
                                          command = partial(self.update_command, 
                                                            self), 
                                          activebackground = 'green', width = 15)
@@ -531,13 +531,13 @@ class _Calibrate_Temp:
         Function to find the desired tuning parameter that was entered 
         in the gui.
         
-        @return     (int)         The tuning parameter that will be set.
+        @return     (float)         The tuning parameter that will be set.
         """        
         # read the parameter from the gui
         param_text = self.param.get()
         # verify if the parameter is valid
         try:
-            int(param_text)
+            float(param_text)
             # is a good parameter so set it as the parameter time
             return param_text
             
@@ -548,7 +548,28 @@ class _Calibrate_Temp:
             # restore the default parameter
             return '0'
         # end if    
-    # end def    
+    # end def  
+    
+    def average_temperatures(self, temp_array):
+        """
+        Function to average the temperatures in a smaple array
+        
+        @param    temp_array   (list of lists)   the sample array
+        @return   (list)                         list of average temperatures
+        """
+        
+        num_samples = len(temp_array)
+        temp_totals = 6*[0]
+        
+        for sample in temp_array:
+            num_sensors = len(sample)
+            for i in range(num_sensors):
+                temp_totals[i] += sample[i]
+            # end for
+        # end for
+        
+        return [temp/num_samples for temp in temp_totals]
+    # end def
     
     def update_command(self, event):
         """
@@ -566,12 +587,49 @@ class _Calibrate_Temp:
                 nvm_key = AARD.read_SCPI("SUP:TEL? 9,data", 
                                          self.properties.address, "uint")+12345   
                 
+                # initialise sample list
+                num_samples = 10
+                temp_samples = num_samples*[6*[0]]
+                
+                for sample in temp_samples:
+                    sample[0] = AARD.read_SCPI("BM2:TEL? 50,data", 
+                                         self.properties.address, "uint")
+                    sample[1] = AARD.read_SCPI("BM2:TEL? 51,data", 
+                                                               self.properties.address, "uint")
+                    sample[2] = AARD.read_SCPI("BM2:TEL? 71,data", 
+                                                               self.properties.address, "uint")
+                    sample[3] = AARD.read_SCPI("BM2:TEL? 72,data", 
+                                                               self.properties.address, "uint")
+                    sample[4] = AARD.read_SCPI("BM2:TEL? 73,data", 
+                                                               self.properties.address, "uint")
+                    sample[5] = AARD.read_SCPI("BM2:TEL? 74,data", 
+                                                               self.properties.address, "uint")
+                    time.sleep(1)
+                # end for
+                
+                # average the temperatures
+                average_temps = self.average_temperatures(temp_samples)
+                
+                # read the current offsets
+                temp_offsets = AARD.read_SCPI("BM2:TEL? 75,data", 
+                                         self.properties.address, 6*["float"])
+                
+                # un-adjust the temperatures read
+                average_temps = [t-o for t,o in zip(average_temps, temp_offsets)]
+                
+                cal_temp = int((float(self.get_param())+273.15)*10)
+                
+                offsets = [cal_temp-t for t in average_temps]
+                
                 # unlock the module NVM, set the tuning parameter and write it 
                 # to the NVM
                 AARD.send_SCPI("SUP:NVM UNLOCK,"+str(nvm_key), 
                                self.properties.address)
-                AARD.send_SCPI("SUP:NVM OSCTUN,"+param_text, 
-                               self.properties.address)
+                for i in range(len(offsets)):
+                    param_text = str(i+2) + ',' + str(offsets[i])
+                    AARD.send_SCPI("BM2:NVM T_OFFSET,"+param_text, 
+                                   self.properties.address)
+                # end for
                 AARD.send_SCPI("SUP:NVM WRITE,1", 
                                self.properties.address)
                 
@@ -602,10 +660,10 @@ class BM2_Process(object):
     __verification = _BM2_verification(properties)
     __heater_test = _BM2_heater_test(properties)
     __update_flash = BM2_flash.Update_Flash(properties)
+    __sup_temp_cal = _Calibrate_Temp(properties)
     
     # construct the list of steps in the process
-    #process = __sup_process.process + \
-    #         [__verification,
-    #          __heater_test]     
-    process = [__update_flash]
+    process = __sup_process.process + \
+             [__update_flash, __sup_temp_cal, __verification,
+             __heater_test]
 #end object

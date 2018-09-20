@@ -43,4 +43,3 @@ main_gui = process_GUI.process_window(BM2_struct)
 main_gui.start()
 
 
-

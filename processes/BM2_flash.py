@@ -33,15 +33,23 @@ import time
 import os
 import openpyxl
 import csv
+import struct
 
 
 #
 # -------
 # Constants
-DATA_FLASH_IDS = [0,1,2,4,16,17,18,19,20,21,32,33,34,36,37,38,39,48,49,56,58,59,
-                  60,64,65,67,68,80,81,82,88,89,90,91,92,93,94,95,96,97,104,
-                  105,106,107]
-
+DATA_FLASH_IDS = [0,1,2,4,
+                  16,17,18,19,
+                  20,21,
+                  32,33,34,36,37,38,39,
+                  48,49,
+                  56,57,58,59,
+                  60,64,65,66,67,68,
+                  80,81,82,83,84,85,86,88,89,
+                  90,91,92,93,94,95,96,97,
+                  104,105,106,107,
+                  112]
 
 #
 # -------
@@ -83,7 +91,7 @@ class Flash_Subclass:
         """
         
         # create a new Flash_page entity
-        return_page = Flash_Subclass(self.subclassID, self.data)
+        return_page = Flash_Subclass(self.subclassID, list(self.data))
         
         # if the data was written to it correctly
         if (return_page.length == self.length):
@@ -352,7 +360,7 @@ class Flash_Page:
         """ 
         Function to convert the page to a usable SCPI command
         """
-        return "BM2:BQF WRITE," + str(self.subclassID) + ',0,' + str(self.length) + ',' + ','.join(self.data)
+        return "BM2:BQF WRITE," + str(self.subclassID) + ',' + str((self.page_number-1)*32) + ',' + str(self.length) + ',' + ','.join(self.data)
     # end def
 # end class
         
@@ -439,21 +447,25 @@ class Update_Flash:
         if (filename != ''):  
             try:
                 # open the csv file
-                csv_input = open(filename, 'wb')
+                csv_input = open(filename, 'rb')
                 
-                first_line = csv_inpt.readline()
+                file_text = csv_input.read()
                 
-                if (first_line == "# Published through BM2_flash.py"):
+                if ("# Published through BM2_flash.py" in file_text):
                     # file is compatible with this program
                     
+                    # re-open the csv file
+                    csv_input.close()
+                    csv_input = open(filename, 'rb')                    
+
                     # define csv reader object
-                    reader = csv.reader(csv_input, delimeter = '/t')
+                    reader = csv.reader(csv_input, delimiter = '\t')
                     
                     # empty the read dictionary
                     self.read_flash_pages = {}
                     
                     for row in reader:
-                        if row[0] == 'Subclass ID':
+                        if (row[0] == 'Subclass ID') or row[0].startswith('#'):
                             # this is the header row
                             next
                             
@@ -520,14 +532,18 @@ class Update_Flash:
                     key_list = sorted_key_list(self.read_flash_pages)
                     
                     for key in key_list:
-                        output_writer.writerow(self.read_flash_pages[key].to_list())
+                        output_list = self.read_flash_pages[key].to_list()[:2]
+                        output_list.extend(self.read_flash_pages[key].to_list()[2])
+                        output_writer.writerow(output_list)
                     # end for
                     
                 else:
                     key_list = sorted_key_list(self.parsed_flash_pages)
                     
                     for key in key_list:
-                        output_writer.writerow(self.parsed_flash_pages[key].to_list())
+                        output_list = self.parsed_flash_pages[key].to_list()[:2]
+                        output_list.extend(self.parsed_flash_pages[key].to_list()[2])
+                        output_writer.writerow(output_list)                        
                     # end for          
                 # end if
                 
@@ -549,18 +565,45 @@ class Update_Flash:
         
         self.disable_buttons()
         
-        # initialise the list of 
+        # initialise the list of pages to write
         pages_to_write = []
         
+        # sort the keys
         keylist = sorted_key_list(self.parsed_flash_pages)
 
+        # populate the list of pages
         for key in keylist:
-            pages_to_write.extend(self.parsed_flash_pages[key].to_pages())
+            if not self.parsed_flash_pages[key].is_equal(self.read_flash_pages[key]):
+                pages_to_write.extend(self.parsed_flash_pages[key].to_pages())
         # end for
         
-        for page in pages_to_write:
-            print page.to_list()
-        # end for
+        with process_SCPI.aardvark() as AARD:
+            # initialise the aardvark
+            if AARD.port != None:
+                
+                # get the serial number
+                serial_number = AARD.read_SCPI("SUP:TEL? 9,data", 
+                                             self.properties.address, 
+                                             'uint')
+                
+                # unlock the flash
+                AARD.send_SCPI(("SUP:NVM UNLOCK," + str(serial_number+12345)), self.properties.address) 
+                
+                # write the flash updating commands
+                for page in pages_to_write:
+                    AARD.send_SCPI(page.to_SCPI(), self.properties.address) 
+                    time.sleep(1)
+                # end for
+                
+                # lock the flash
+                AARD.send_SCPI("SUP:NVM WRITE,1", self.properties.address)                            
+                
+            else:
+                # no aardvark was found
+                self.no_aardvark = True
+                
+            #end if
+        # end with        
         
         # re-enable buttons
         self.parse_button.config(state = 'normal')
@@ -586,8 +629,7 @@ class Update_Flash:
             recieved_page = self.read_BM2_page(ID, current_page)
             
             if (recieved_page.length == 0):
-                # catch for empty pages
-                pass
+                print "subclass " + str(ID) + " is empty"
             
             else:
                 # store the page
@@ -608,11 +650,16 @@ class Update_Flash:
                     recieved_subclass.append(recieved_page.data)
                 # end if
             # end while
-            self.read_flash_pages[str(ID)] = recieved_subclass
+            
+            if (recieved_subclass.length != 0):
+                self.read_flash_pages[str(ID)] = recieved_subclass
+            # end if
         # end for
         
         self.load_button.config(state = 'normal')
-        self.read_button.config(state = 'normal')        
+        self.read_button.config(state = 'normal')  
+        self.parse_button.config(state = 'normal')
+        self.save_button.config(state = 'normal')
     # end def
     
     def read_BM2_page(self, ID, page):
@@ -681,6 +728,8 @@ class Update_Flash:
         if self.excel_path == '':
             print 'No Excel file selected'
             self.load_button.config(state = 'normal')
+            self.read_button.config(state = 'normal')
+            self.parse_button.config(state = 'normal')            
             return 0
         # end if
             
@@ -694,6 +743,8 @@ class Update_Flash:
             # no configuration information was found
             print 'No configuration selected'
             self.load_button.config(state = 'normal')
+            self.read_button.config(state = 'normal')
+            self.parse_button.config(state = 'normal')            
             return 0
         # end if
         
@@ -704,6 +755,8 @@ class Update_Flash:
         self.load_button.config(state = 'normal')
         self.write_button.config(state = 'normal')
         self.read_button.config(state = 'normal')
+        self.parse_button.config(state = 'normal')
+        self.save_button.config(state = 'normal')
     # end def
     
     def get_flash_configuration(self, workbook):
@@ -741,16 +794,16 @@ class Update_Flash:
         self.config_window.title('Select the desired Configuration')
         
         # define the options variable for the Menu
-        selected_option = TK.StringVar()
-        selected_option.set(config_titles[0])
+        self.selected_option = TK.StringVar()
+        self.selected_option.set(config_titles[0])
         
         # define the Option Menu to allow configuration selection
-        config_menu = apply(TK.OptionMenu, (self.config_window, selected_option) + tuple(config_titles))
+        config_menu = apply(TK.OptionMenu, (self.config_window, self.selected_option) + tuple(config_titles))
         config_menu.grid(row = 0, column = 0)
         
         # define the button to execute selection of the configurtion
         select_button = TK.Button(self.config_window, text = 'Select', 
-                                 command = partial(self.set_configuration, selected_option.get()), 
+                                 command = self.set_configuration, 
                                  activebackground = 'green', width = 15)
         select_button.grid(row = 0, column = 1)
         
@@ -759,6 +812,8 @@ class Update_Flash:
         
         # wait for the pop-up window to be exited
         self.config_window.wait_window()    
+        
+        print self.configuration
     # end def
     
     def extract_flash_data(self, workbook):
@@ -930,7 +985,13 @@ class Update_Flash:
                     # with zeros
                     return [str(string_len)] + [str(ord(c)) for c in data] + (size-string_len-1)*['0']                  
                 # end if
-            
+                
+            elif format_string == 'Float':
+                return_list = [str(b) for b in encode_TI_float(data)]
+                print 'made it here'
+                print "Float = " + str(data) + ", array = [" + ", ".join(return_list) + "]"
+                return return_list
+                
             else:
                 print 'Unrecognised Format = ' + format_string
                 return size*['0']
@@ -938,15 +999,15 @@ class Update_Flash:
         
         except:
             print 'failed to parse'
+            return size*['0']
     # end def
         
-    def set_configuration(self, configuration):
+    def set_configuration(self):
         """
         Take provided configuration and store it to the class
         
-        @param   configuration  (String)  The configuration to store
         """
-        self.configuration = configuration
+        self.configuration = self.selected_option.get()
         self.config_window.destroy()
     # end def
     
@@ -1139,3 +1200,119 @@ def sorted_key_list(input_dict):
     return key_list
 # end def
             
+def encode_TI_float(val):
+    """
+    Encode a floating point number as per TI's encoding format as per page 119
+    of sluuax0c.pdf.
+    
+    @param    val         (float)   The floating point value to encode.
+    @return   rawData     (list)    The encoded float as a four byte list
+    """
+    rawData = 4*[0]
+    
+    exp = 0
+    
+    if (val == 0.0):
+        # catch the zero trap before getting stuck in infinite loop
+        return rawData
+    
+    elif (val < 0):
+        mod_val = -val
+        
+    else:
+        mod_val = val
+    # end if
+    
+    tmpVal = mod_val
+    
+    tmpVal = tmpVal * (1 + 2**-35)
+    
+    if (tmpVal < 0.5):
+        while (tmpVal < 0.5):
+            tmpVal*=2
+            exp-=1
+        # end while
+        
+    elif (tmpVal >= 1.0):
+        while (tmpVal >= 1.0):
+            tmpVal/=2.0
+            exp+=1
+        # end while
+    # end if
+    
+    if (exp > 127):
+        exp = 127
+        
+    elif (exp < -128):
+        exp = -128
+    # end if
+    
+    tmpVal = ((2**(8-exp)) * mod_val) - 128
+    
+    byte2 = int(tmpVal // 1)
+    
+    tmpVal = (2**8) * (tmpVal - byte2)
+    
+    byte1 = int(tmpVal // 1)
+    
+    tmpVal = (2**8) * (tmpVal - byte1)
+    
+    byte0 = int(tmpVal // 1)
+    
+    if (val < 0):
+        byte2 |= 0x80
+    # end if
+    
+    rawData[0] = exp + 128
+    
+    rawData[1] = byte2
+    
+    rawData[2] = byte1
+    
+    rawData[3] = byte0
+    
+    return rawData
+# end def
+
+def decode_TI_float(rawData):
+    """
+    Decode a floating point number as per TI's encoding format as per page 119
+    of sluuax0c.pdf.
+    
+    @param    rawData         (list)   The list to decode.
+    @return   val             (float)  The decoded float.
+    """
+    
+    byte0 = rawData[3]
+    
+    byte1 = rawData[2]
+    
+    byte2 = rawData[1]
+    
+    exp = rawData[0] - 128   
+    
+    if (byte2 & 0x80):
+        is_neg = True
+        byte2 &= 0x7F
+        
+    else:
+        is_neg = False
+    # end if
+    
+    tmpVal = byte0
+    
+    tmpVal = tmpVal/(2.0**8) + byte1
+    
+    tmpVal = tmpVal/(2.0**8) + byte2
+    
+    mod_val = (tmpVal + 128)/(2.0**(8-exp))
+    
+    if is_neg:
+        val = -mod_val
+            
+    else:
+        val = mod_val
+    # end if
+    
+    return val
+# end def
