@@ -117,7 +117,7 @@ class Flash_Subclass:
                 self.data[offset] = item
             
             except:
-                print str(self.subclassID) + ', offset ' + str(offset) + ' is an overrun'
+                print 'Subclass ' + str(self.subclassID) + ', offset ' + str(offset) + ' is an overrun'
             # end try
             offset += 1
         # end for
@@ -629,7 +629,14 @@ class Update_Flash:
             recieved_page = self.read_BM2_page(ID, current_page)
             
             if (recieved_page.length == 0):
-                print "subclass " + str(ID) + " is empty"
+                recieved_page = self.read_BM2_page(ID, current_page)
+                if (recieved_page.length == 0):
+                    print "subclass " + str(ID) + " is empty"
+                    
+                else:
+                    # store the page
+                    recieved_subclass.append(recieved_page.data)
+                # end if
             
             else:
                 # store the page
@@ -729,7 +736,8 @@ class Update_Flash:
             print 'No Excel file selected'
             self.load_button.config(state = 'normal')
             self.read_button.config(state = 'normal')
-            self.parse_button.config(state = 'normal')            
+            self.parse_button.config(state = 'normal')    
+            self.save_button.config(state = 'normal')  
             return 0
         # end if
             
@@ -988,8 +996,6 @@ class Update_Flash:
                 
             elif format_string == 'Float':
                 return_list = [str(b) for b in encode_TI_float(data)]
-                print 'made it here'
-                print "Float = " + str(data) + ", array = [" + ", ".join(return_list) + "]"
                 return return_list
                 
             else:
@@ -998,7 +1004,7 @@ class Update_Flash:
             # end if
         
         except:
-            print 'failed to parse'
+            print 'failed to parse ' + format_string + ' ' + str(data)
             return size*['0']
     # end def
         
@@ -1146,6 +1152,7 @@ class Update_Flash:
         self.body.grid_forget()
         self.load_button.grid_forget()
         self.lifetime_checkbox.grid_forget()
+        self.cal_checkbox.grid_forget()
         self.write_button.grid_forget()
         self.read_button.grid_forget()
         self.save_button.grid_forget()
